@@ -1,4 +1,4 @@
-//****************************************************************
+//***************************
 // MonsterBase
 // MonsterHunt's base mutator
 class MonsterBase expands Mutator;
@@ -52,7 +52,7 @@ function PostBeginPlay()
 
 //MonsterHuntArena sets all weapon/ammo respawn time to 3.0
 
-function bool CheckReplacement (Actor Other, out byte bSuperRelevant)
+function bool CheckReplacement( Actor Other, out byte bSuperRelevant)
 {
 	local Inventory Inv;
 	local int i;
