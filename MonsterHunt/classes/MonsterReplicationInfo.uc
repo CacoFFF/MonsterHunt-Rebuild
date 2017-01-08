@@ -25,5 +25,7 @@ simulated function Timer()
 			MonsterHunt(Level.Game).bCountMonstersAgain = false;
 			Monsters = MonsterHunt(Level.Game).CountMonsters();
 		}
+		if ( MonsterHunt(Level.Game).bCheckEndLivesAgain )
+			MonsterHunt(Level.Game).CheckEndGame();
 	}
 }

@@ -9,6 +9,7 @@ var() config int Lives;
 var() config bool bUseTeamSkins;
 
 var bool bCountMonstersAgain; //Monster counting isn't immediate, helps other mutators properly affect monsters before we do it
+var bool bCheckEndLivesAgain;
 
 //User-define kill scores
 var() config name MonsterKillType[10];
@@ -62,12 +63,32 @@ function StartMatch()
 	GameReplicationInfo.Timer();
 }
 
+function CheckEndGame()
+{
+	local int KnockedOut;
+	local PlayerReplicationInfo PRI;
+
+	if ( bGameEnded || (Lives <= 0) )
+		return;
+		
+	//Task bots to attack?
+	ForEach AllActors( class'PlayerReplicationInfo', PRI)
+		if ( Spectator(PRI.Owner) != None )
+		{
+			if ( (PRI.Deaths > 0) && (PRI.Deaths >= Lives) )
+				KnockedOut++;
+			else
+				return; //Game not ended
+		}
+	if ( KnockedOut > 0 )
+		EndGame("No hunters");
+}
+
 function bool RestartPlayer( Pawn aPlayer)
 {
-	local NavigationPoint StartSpot;
-	local bool foundStart;
-	local Pawn P;
+	local bool Result;
 
+	aPlayer.Visibility = aPlayer.default.Visibility;
 	if ( (Lives > 0) && (aPlayer.PlayerReplicationInfo != None) && (aPlayer.PlayerReplicationInfo.Deaths >= Lives) )
 	{
 		if ( bRestartLevel && (Level.NetMode == NM_Standalone) ) //This is coop code
@@ -82,7 +103,9 @@ function bool RestartPlayer( Pawn aPlayer)
 		}
 		aPlayer.PlayerRestartState = 'PlayerSpectating';
 	}
-    return Super.RestartPlayer(aPlayer);
+    Result = Super.RestartPlayer(aPlayer);
+	if ( aPlayer.bHidden )
+		aPlayer.Visibility = 0;
 }
 
 //If a pawn is spawned, let game we want to count all monsters again
@@ -106,6 +129,12 @@ function bool ChangeTeam(Pawn Other, int NewTeam)
 	}
 }
 
+function Killed (Pawn Killer, Pawn Other, name DamageType)
+{
+	Super.Killed(Killer,Other,DamageType);
+	if ( (Lives > 0) && Other.bIsPlayer && (Other.PlayerReplicationInfo != None) && (Other.PlayerReplicationInfo.Deaths >= Lives) )
+		bCheckEndLivesAgain = true;
+}
 
 function ScoreKill( Pawn Killer, Pawn Other)
 {
@@ -130,7 +159,16 @@ function ScoreKill( Pawn Killer, Pawn Other)
 			Killer.PlayerReplicationInfo.Score += 9;
 	}
 	else
+	{
 		Super.ScoreKill(Killer,Other);
+		if ( (Other.PlayerReplicationInfo != None) && (Lives > 0) )
+		{
+			if ( Killer == Other )
+				Killer.PlayerReplicationInfo.Score -= 4;
+			else if ( Killer.IsA('ScriptedPawn') )
+				Killer.PlayerReplicationInfo.Score -= 5;
+		}
+	}
 }
 
 
