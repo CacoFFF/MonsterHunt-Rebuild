@@ -3,6 +3,8 @@
 //================================================================================
 class MonsterEvent expands Triggers;
 
+#exec TEXTURE IMPORT NAME=MHEvent FILE=pcx\MHEvent.pcx
+
 var() localized string Message;
 var() bool bBroadcastOnceOnly;
 var bool bDisabled;

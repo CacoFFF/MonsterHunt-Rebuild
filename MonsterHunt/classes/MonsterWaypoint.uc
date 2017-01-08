@@ -4,6 +4,8 @@
 // This actor now also becomes a Trigger
 class MonsterWaypoint expands Triggers;
 
+#exec TEXTURE IMPORT NAME=MHMarker FILE=pcx\MHMarker.pcx
+
 var(Waypoint) int Position;
 var(Waypoint) bool bEnabled;
 var bool bVisited;

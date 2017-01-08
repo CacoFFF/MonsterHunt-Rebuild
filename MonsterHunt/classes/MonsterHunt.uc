@@ -7,6 +7,7 @@ class MonsterHunt expands TeamGamePlus
 var() config int MonsterSkill; //0 to 7 in v1...
 var() config int Lives;
 var() config bool bUseTeamSkins;
+var() config bool bReplaceUIWeapons;
 
 var bool bCountMonstersAgain; //Monster counting isn't immediate, helps other mutators properly affect monsters before we do it
 var bool bCheckEndLivesAgain;
@@ -539,6 +540,7 @@ defaultproperties
 	MonsterSkill=5
 	Lives=6
 	bUseTeamSkins=True
+	bReplaceUIWeapons=True
 	TimeLimit=30
 	MutatorClass=Class'MonsterBase'
 	DefaultWeapon=Class'Botpack.ChainSaw'

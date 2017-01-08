@@ -3,7 +3,7 @@
 // MonsterHunt's base mutator
 class MonsterBase expands Mutator;
 
-var DeathMatchPlus Game;
+var MonsterHunt Game;
 var() name UIWeaponName[10];
 var() string UIWeaponReplacement[10];
 
@@ -21,7 +21,7 @@ function AddMutator( Mutator M)
 
 function PostBeginPlay()
 {
-	Game = DeathMatchPlus(Level.Game);
+	Game = MonsterHunt(Level.Game);
 	//Reduce amount of traces per second on servers
 	if ( Level.NetMode != NM_Standalone )
 	{
@@ -71,7 +71,7 @@ function bool CheckReplacement( Actor Other, out byte bSuperRelevant)
 	{
 		if ( Other.IsA('Weapon') )
 		{
-			if ( Other.IsA('TournamentWeapon') )
+			if ( Other.IsA('TournamentWeapon') || !Game.bReplaceUIWeapons )
 				return True;
 			For ( i=0 ; i<10 ; i++ )
 				if ( Other.IsA(UIWeaponName[i]) && (UIWeaponReplacement[i] != "") )
