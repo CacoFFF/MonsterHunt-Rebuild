@@ -16,6 +16,14 @@ replication
 simulated function Timer()
 {
 	Super.Timer();
-	Hunters = MonsterHunt(Level.Game).CountHunters();
-	Lives = MonsterHunt(Level.Game).Lives;
+	if ( Level.NetMode != NM_Client )
+	{
+		Hunters = MonsterHunt(Level.Game).CountHunters();
+		Lives = MonsterHunt(Level.Game).Lives;
+		if ( MonsterHunt(Level.Game).bCountMonstersAgain || (FRand() < 0.05) )
+		{
+			MonsterHunt(Level.Game).bCountMonstersAgain = false;
+			Monsters = MonsterHunt(Level.Game).CountMonsters();
+		}
+	}
 }

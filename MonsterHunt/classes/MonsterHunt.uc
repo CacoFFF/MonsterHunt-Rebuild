@@ -8,6 +8,12 @@ var() config int MonsterSkill; //0 to 7 in v1...
 var() config int Lives;
 var() config bool bUseTeamSkins;
 
+var bool bCountMonstersAgain; //Monster counting isn't immediate, helps other mutators properly affect monsters before we do it
+
+//User-define kill scores
+var() config name MonsterKillType[10];
+var() config int MonsterKillScore[10];
+
 //********************
 // XC_Core / XC_Engine
 native(3540) final iterator function PawnActors( class<Pawn> PawnClass, out pawn P, optional float Distance, optional vector VOrigin, optional bool bHasPRI, optional Pawn StartAt);
@@ -22,8 +28,111 @@ event InitGame(string Options, out string Error)
 	
 	Super.InitGame( Options, Error);
 	
-	MonsterReplicationInfo(GameReplicationInfo).Monsters = CountMonsters();
+	bCountMonstersAgain = true;
 }
+
+event PostLogin( PlayerPawn NewPlayer )
+{
+	//Don't update player's Team in his URL
+	Super(DeathMatchPlus).PostLogin(NewPlayer);
+	CountHunters();
+	//Prevent monsters from attacking spectators
+	if ( NewPlayer.PlayerReplicationInfo != None && NewPlayer.PlayerReplicationInfo.bIsSpectator )
+	{
+		NewPlayer.Visibility = 0;
+		NewPlayer.Health = 0; //Will this one work?
+	}
+}
+
+event PlayerPawn Login( string Portal, string Options, out string Error, Class<PlayerPawn> SpawnClass)
+{
+	local PlayerPawn NewPlayer;
+	local NavigationPoint StartSpot;
+
+	NewPlayer = Super.Login( Portal, Options, Error, SpawnClass);
+	if ( NewPlayer != None )
+		CountHunters();
+	return NewPlayer;
+}
+
+//Recont everything right after match starts
+function StartMatch()
+{
+	Super.StartMatch();
+	GameReplicationInfo.Timer();
+}
+
+function bool RestartPlayer( Pawn aPlayer)
+{
+	local NavigationPoint StartSpot;
+	local bool foundStart;
+	local Pawn P;
+
+	if ( (Lives > 0) && (aPlayer.PlayerReplicationInfo != None) && (aPlayer.PlayerReplicationInfo.Deaths >= Lives) )
+	{
+		if ( bRestartLevel && (Level.NetMode == NM_Standalone) ) //This is coop code
+			return True;
+		BroadcastMessage( aPlayer.PlayerReplicationInfo.PlayerName $ " has been lost!", True, 'MonsterCriticalEvent');
+		if ( !aPlayer.IsA('PlayerPawn') )
+		{
+			aPlayer.PlayerReplicationInfo.bIsSpectator = True;
+			aPlayer.PlayerReplicationInfo.bWaitingPlayer = True;
+			aPlayer.GotoState('GameEnded');
+			return False;
+		}
+		aPlayer.PlayerRestartState = 'PlayerSpectating';
+	}
+    return Super.RestartPlayer(aPlayer);
+}
+
+//If a pawn is spawned, let game we want to count all monsters again
+function bool IsRelevant( Actor Other)
+{
+	if ( Other.bIsPawn )
+		bCountMonstersAgain = true;
+	return Super.IsRelevant( Other);
+}
+
+function bool ChangeTeam(Pawn Other, int NewTeam)
+{
+	local bool Result;
+	local string SkinName, FaceName;
+	
+	Result = Super.ChangeTeam( Other, 0); //Add to red team
+	if ( !bUseTeamSkins )
+	{
+		Other.static.GetMultiSkin(Other, SkinName, FaceName); //Apply non-team skin
+		Other.static.SetMultiSkin(Other, SkinName, FaceName, NewTeam);
+	}
+}
+
+
+function ScoreKill( Pawn Killer, Pawn Other)
+{
+	local int i;
+	local bool bSpecialScore;
+	local ScriptedPawn S;
+
+	bCountMonstersAgain = true;
+	if ( (Killer != None) && Killer.bIsPlayer && (Killer.PlayerReplicationInfo != None) && (ScriptedPawn(Other) != None) )
+	{
+		BroadcastMessage( Killer.GetHumanName() @ "killed" $ Other.GetHumanName());
+		For ( i=0 ; i<10 && (MonsterKillType[i] != '') )
+			if ( Other.IsA(MonsterKillType[i]) )
+			{
+				bSpecialScore = true;
+				Killer.PlayerReplicationInfo.Score += MonsterKillScore[i];
+				break;
+			}
+		if ( !bSpecialScore )
+			Killer.PlayerReplicationInfo.Score += Sqrt( float(Other.default.Health) * 0.01 );
+		if ( ScriptedPawn(Other).bIsBoss )
+			Killer.PlayerReplicationInfo.Score += 9;
+	}
+	else
+		Super.ScoreKill(Killer,Other);
+}
+
 
 
 //Entry point from old MH.u
@@ -150,4 +259,15 @@ defaultproperties
 	GameEndedMessage="Hunt Successful!"
 	TimeOutMessage="Time up, hunt failed!"
 	SingleWaitingMessage="Press Fire to begin the hunt."
+	
+	MonsterKillType(0)=Nali
+	MonsterKillScore(0)=-6
+	MonsterKillType(1)=Cow
+	MonsterKillScore(1)=-6
 }
+
+
+
+
+
+
