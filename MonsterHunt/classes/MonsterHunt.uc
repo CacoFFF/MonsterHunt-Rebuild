@@ -16,6 +16,7 @@ var() config name MonsterKillType[10];
 var() config int MonsterKillScore[10];
 
 var MonsterWaypoint WaypointList;
+var ScriptedPawn ReachableEnemy;
 
 //********************
 // XC_Core / XC_Engine
@@ -215,6 +216,210 @@ function SetPawnDifficulty( int Diff, ScriptedPawn S)
 		S.Shadow = Spawn( Class'MonsterShadow', S);
 }
 
+function TaskMonstersVsBot( Bot aBot)
+{
+	local ScriptedPawn S;
+	ForEach AllActors(Class'ScriptedPawn',S)
+	{
+		if ( S.CanSee(aBot) )
+		{
+			if ( ((S.Enemy == None) || S.Enemy.IsA('PlayerPawn') && (FRand() >= 0.5)) && (S.Health >= 1) )
+			{
+				S.Hated = aBot;
+				S.Enemy = aBot;
+				aBot.Enemy = S;
+				S.GotoState('Attacking');
+				if ( FRand() >= 0.35 )
+				{
+					aBot.GotoState('Attacking');
+					return False;
+				}
+			}
+		}
+		else
+		{
+			if ( aBot.CanSee(S) && (FRand() >= 0.34999999) && (S.Health >= 1) )
+			{
+				aBot.Enemy = S;
+				aBot.GotoState('Attacking');
+				S.Enemy = aBot;
+				S.GotoState('Attacking');
+				return False;
+			}
+		}
+	}
+}
+function TaskMonstersVsBot_XC( Bot aBot);
+
+
+//Sets MoveTarget on pawn
+//Can be called recursively once
+function bool AttractTo( Pawn Other, Actor Dest, optional bool bNoSearch)
+{
+	local NavigationPoint N, Nearest;
+	local float Dist, BestDist;
+	local vector Vect;
+	
+	if ( Other.ActorReachable(Dest) ) //Check actor
+	{
+		Other.MoveTarget = Dest;
+		return true;
+	}
+	Vect = Dest.Location + Normal( Other.Location - Dest.Location) * (Other.CollisionRadius + Dest.CollisionRadius);
+	if ( Other.PointReachable( Vect) ) //Check a point that allows touching the actor
+	{
+		Other.MoveTarget = Dest;
+		return true;
+	}
+	N = NavigationPoint(Other.FindPathToward(Dest) ); //Find path to actor
+	if ( N != None )
+	{
+		Other.MoveTarget = N;
+		return true;
+	}
+	N = NavigationPoint(Other.FindPathTo(Vect) ); //Find path to said point
+	if ( N != None )
+	{
+		Other.MoveTarget = N;
+		return true;
+	}
+	
+	if ( !bNoSearch )
+	{
+		BestDist = 500;
+		ForEach Dest.RadiusActors( class'NavigationPoint', N, 300 )
+			if ( N != Dest )
+			{
+				Vect = N.Location - Dest.Location;
+				Dist = VSize( Vect);
+				if ( Dist < BestDist )
+				{
+					Vect = Normal( Vect);
+					Vect.X *= Dest.CollisionRadius;
+					Vect.Y *= Dest.CollisionRadius;
+					Vect.Z *= Dest.CollisionHeight * 0.5;
+					if ( N.FastTrace(Dest.Location + Vect) )
+					{
+						Nearest = N;
+						BestDist = Dist;
+					}
+				}
+			}
+		if ( Nearest != None )
+		{
+			if ( VSize(Nearest.Location - Other.Location) < 30 ) //We're touching nearest waypoint, go straight to destination
+			{
+				Other.MoveTarget = Dest;
+				return true;
+			}
+			return AttractTo( Other, Nearest, true); //Recurse once and attract to Nearest
+		}
+	}
+	return false;
+}
+
+function bool FindSpecialAttractionFor( Bot aBot)
+{
+	local MonsterWaypoint W, BestW;
+	local float ChanceW;
+	local MonsterEnd E;
+	local Actor NewDest;
+	local int Limit;
+	local int BotID;
+	local float BotState;
+
+	if ( aBot.LastAttractCheck == Level.TimeSeconds )
+		return false;
+
+	if ( aBot.Health < 1 ) //Is this even needed?
+	{
+		aBot.GotoState('GameEnded');
+		return False;
+	}
+
+	if ( Level.TimeSeconds - aBot.LastAttractCheck > 0.3 )
+		TaskMonstersVsBot(aBot);
+	aBot.LastAttractCheck = Level.TimeSeconds;
+	
+	//Force attack for now...
+	if ( (aBot.Orders == 'Attack') || (aBot.Orders == 'Freelance') )
+	{
+		BotID = aBot.PlayerReplicationInfo.PlayerID + Asc(aBot.PlayerReplicationInfo $ "A");
+		BotState = BotID + Level.TimeSeconds * 0.5;
+		Limit = 2 + int(aBot.Orders == 'Attack')*2 + int(aBot.Enemy == None)*2 + int(aBot.Weapon != none && aBot.Weapon.AiRating > 0.5)*2;
+		BotState = BotState % Limit;
+		//3 seconds for inventory grabbing
+		if ( BotState < 1.5 ) 
+			return False;
+		//8 seconds prioritizing monsters
+		if ( aBot.Enemy != None && (BotState < 4) )
+		{
+			if ( AttractTo( aBot, aBot.Enemy) )
+				Goto ATTRACT_DEST;
+		}
+		
+		//Otherwise prioritize the main objectives (sorted by priority)
+		//Start with previously assigned goal
+		BestW = MonsterWaypoint(aBot.OrderObject);
+		if ( (BestW != None) && BestW.bEnabled && !BestW.bVisited && AttractTo( aBot, BestW) )
+			Goto ATTRACT_DEST;
+		BestW = None;
+
+		ChanceW = 1;
+		Limit = 0;
+		For ( W=WaypointList ; W!=None ; W=W.NextWaypoint )
+		{
+			if ( W.bEnabled && !W.bVisited )
+			{
+				if ( Limit <= 0 )
+					Limit = W.Position;
+				else if ( W.Position > Limit-2 ) //Don't seek past next 2 objectives (speed reasons, game reasons, etc)
+					return False;
+				if ( AttractTo(aBot,W) ) //Only query reachable objectives
+				{
+					if ( BestW == None ) //Get first one
+						BestW = W;
+					else if ( W.Position > BestW.Position ) //Stop if we're going past the position
+						break;
+					else //Otherwise randomize among WP's with same priority
+					{
+						ChanceW += 1.0;
+						if ( FRand() < 1.0/ChanceW )
+							BestW = W;
+					}
+					
+					//We changed objectives, change attraction point
+					if ( BestW = W )
+						NewDest = aBot.MoveTarget;
+				}
+			}
+		}
+		
+		//Assign objective and attract
+		if ( NewDest != None )
+		{
+			aBot.OrderObject = BestW;
+			aBot.MoveTarget = NewDest;
+			Goto ATTRACT_DEST;
+		}
+
+		
+		ForEach AllActors( Class'MonsterEnd', E)
+			if ( E.bCollideActors && AttractTo(aBot, E) )
+			{
+				NewDest = aBot.MoveTarget; //Jumping outside a ForEach iterator is very ugly, avoid it
+				break;
+			}
+		if ( NewDest != None )
+			Goto ATTRACT_DEST;
+	}
+	return False;
+ATTRACT_DEST:
+	SetAttractionStateFor(aBot);
+	return true;
+}
+
+
 //****************************************
 // Utilitary methods
 // XC versions are used in XC_Engine servers
@@ -302,6 +507,30 @@ function RegisterWaypoint( MonsterWaypoint Other)
 			}
 		}
 	}
+}
+
+//Waypoint has been visited
+function WaypointVisited( MonsterWaypoint Other)
+{
+	UnregisterWaypoint( Other);
+}
+
+function UnregisterWaypoint( MonsterWaypoint Other)
+{
+	local MonsterWaypoint MW;
+
+	if ( Other == WaypointList )
+		WaypointList = Other.WaypointList;
+	else
+	{
+		For ( MW=WaypointList ; MW!=None ; MW=MW.NextWaypoint )
+			if ( MW.NextWaypoint == Other )
+			{
+				MW.NextWaypoint = Other.NextWaypoint;
+				break;
+			}
+	}
+	Other.NextWaypoint = None;
 }
 
 

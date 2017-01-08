@@ -35,6 +35,8 @@ function Touch( Actor Other)
 		if ( Event != '' )
 			ForEach AllActors (class'Actor', A, Event)
 				A.Trigger( self, Pawn(Other));
+		if ( MonsterHunt(Level.Game) != None )
+			MonsterHunt(Level.Game).WaypointVisited( self);
  	}
 }
 
