@@ -15,6 +15,8 @@ var bool bCheckEndLivesAgain;
 var() config name MonsterKillType[10];
 var() config int MonsterKillScore[10];
 
+var MonsterWaypoint WaypointList;
+
 //********************
 // XC_Core / XC_Engine
 native(3540) final iterator function PawnActors( class<Pawn> PawnClass, out pawn P, optional float Distance, optional vector VOrigin, optional bool bHasPRI, optional Pawn StartAt);
@@ -171,8 +173,6 @@ function ScoreKill( Pawn Killer, Pawn Other)
 	}
 }
 
-
-
 //Entry point from old MH.u
 function SetPawnDifficulty( int Diff, ScriptedPawn S)
 {
@@ -227,7 +227,7 @@ function ProcessMonster( ScriptedPawn S)
 	SetPawnDifficulty(MonsterSkill,S);
 }
 
-
+//Monster counter
 function int CountMonsters()
 {
 	local int i;
@@ -256,7 +256,7 @@ function int CountMonsters_XC()
 	return i;
 }
 
-
+//Hunter counter
 function int CountHunters()
 {
 	local int i;
@@ -276,6 +276,32 @@ function int CountHunters_XC()
 		if ( !P.IsA('ScriptedPawn') && !P.PlayerReplicationInfo.bIsSpectator )
 			i++;
 	return i;
+}
+
+//Waypoint chainer
+function RegisterWaypoint( MonsterWaypoint Other)
+{
+	local MonsterWaypoint MW;
+
+	if ( (WaypointList == None) || (WaypointList.Position > Other.Position) )
+	{
+		Other.NextWaypoint = WaypointList;
+		WaypointList = Other;
+	}
+	else
+	{
+		For ( MW=WaypointList ; MW!=None ; MW=MW.NextWaypoint )
+		{
+			if ( MW == Other ) //BUG
+				break;
+			if ( (MW.NextWaypoint == None) || (MW.NextWaypoint.Position > Other.Position) )
+			{
+				Other.NextWaypoint = MW.NextWaypoint;
+				MW.NextWaypoint = Other;
+				break;
+			}
+		}
+	}
 }
 
 
