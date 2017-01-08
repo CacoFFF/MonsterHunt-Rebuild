@@ -23,7 +23,7 @@ event PostBeginPlay()
 		MonsterHunt(Level.Game).RegisterWaypoint( self);
 }
 
-function Touch (Actor Other)
+function Touch( Actor Other)
 {
 	local Actor A;
 	//Generic player
@@ -36,6 +36,12 @@ function Touch (Actor Other)
 			ForEach AllActors (class'Actor', A, Event)
 				A.Trigger( self, Pawn(Other));
  	}
+}
+
+event Trigger( Actor Other, Pawn EventInstigator)
+{
+	if ( !bVisited )
+		bEnabled = true;
 }
 
 defaultproperties
