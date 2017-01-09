@@ -113,6 +113,7 @@ function bool RestartPlayer( Pawn aPlayer)
     Result = Super.RestartPlayer(aPlayer);
 	if ( aPlayer.bHidden )
 		aPlayer.Visibility = 0;
+	return Result;
 }
 
 //If a pawn is spawned, let game we want to count all monsters again
@@ -134,6 +135,7 @@ function bool ChangeTeam(Pawn Other, int NewTeam)
 		Other.static.GetMultiSkin(Other, SkinName, FaceName); //Apply non-team skin
 		Other.static.SetMultiSkin(Other, SkinName, FaceName, NewTeam);
 	}
+	return Result;
 }
 
 function Killed (Pawn Killer, Pawn Other, name DamageType)
@@ -544,6 +546,70 @@ function UnregisterWaypoint( MonsterWaypoint Other)
 	Other.NextWaypoint = None;
 }
 
+function AddToTeam( int num, Pawn Other )
+{
+	local TeamInfo aTeam;
+	local bool bSuccess;
+	local string SkinName, FaceName;
+	local PlayerReplicationInfo PRI;
+
+	if ( Other == None )
+		return;
+
+	aTeam = Teams[0];
+	aTeam.Size++;
+	Other.PlayerReplicationInfo.Team = 0;
+	Other.PlayerReplicationInfo.TeamName = aTeam.TeamName;
+	if ( Other.IsA('PlayerPawn') )
+	{
+		Other.PlayerReplicationInfo.TeamID = 0;
+		PlayerPawn(Other).ClientChangeTeam(Other.PlayerReplicationInfo.Team);
+	}
+	else
+		Other.PlayerReplicationInfo.TeamID = 1;
+
+	while ( !bSuccess )
+	{
+		bSuccess = true;
+		ForEach AllActors ( class'PlayerReplicationInfo', PRI)
+			if ( (PRI != Other.PlayerReplicationInfo) && (PRI.Team == Other.PlayerReplicationInfo.Team) && (PRI.TeamID == Other.PlayerReplicationInfo.TeamID) )
+			{
+				Other.PlayerReplicationInfo.TeamID++; //This trick works great with AllActors, this will most like only loop twice!
+				bSuccess = false;
+			}
+	}
+
+	BroadcastLocalizedMessage( DMMessageClass, 3, Other.PlayerReplicationInfo, None, aTeam );
+
+	Other.static.GetMultiSkin(Other, SkinName, FaceName);
+	Other.static.SetMultiSkin(Other, SkinName, FaceName, num);
+}
+
+//Fix annoying spam
+function ChangeName(Pawn Other, string S, bool bNameChange)
+{
+	local PlayerReplicationInfo PRI;
+
+	if ( S == "" )
+		return;
+	S = left(S,24);
+	if (Other.PlayerReplicationInfo.PlayerName~=S)
+		return;
+	
+	ForEach AllActors( class'PlayerReplicationInfo', PRI)
+		if ( PRI.PlayerName ~= S )
+		{
+			Other.ClientMessage(S$NoNameChange);
+			return;
+		}
+	Other.PlayerReplicationInfo.OldName = Other.PlayerReplicationInfo.PlayerName;
+	Other.PlayerReplicationInfo.PlayerName = S;
+	if ( bNameChange && !Other.IsA('Spectator') )
+		BroadcastLocalizedMessage( DMMessageClass, 2, Other.PlayerReplicationInfo );			
+	if (LocalLog != None)	LocalLog.LogNameChange(Other);
+	if (WorldLog != None)	WorldLog.LogNameChange(Other);
+}
+
 
 defaultproperties
 {
@@ -554,6 +620,7 @@ defaultproperties
 	TimeLimit=30
 	MutatorClass=Class'MonsterBase'
 	DefaultWeapon=Class'Botpack.ChainSaw'
+	GameReplicationInfoClass=Class'MonsterReplicationInfo'
 	MapPrefix="MH"
 	BeaconName="MH"
 	LeftMessage=" left the hunt."
@@ -564,7 +631,7 @@ defaultproperties
 	GameEndedMessage="Hunt Successful!"
 	TimeOutMessage="Time up, hunt failed!"
 	SingleWaitingMessage="Press Fire to begin the hunt."
-	
+
 	MonsterKillType(0)=Nali
 	MonsterKillScore(0)=-6
 	MonsterKillType(1)=Cow

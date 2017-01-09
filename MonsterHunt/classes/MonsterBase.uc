@@ -58,7 +58,7 @@ function bool CheckReplacement( Actor Other, out byte bSuperRelevant)
 	local int i;
 
 	bSuperRelevant = 1;
-	if ( MyGame.bMegaSpeed && Other.bIsPawn && Pawn(Other).bIsPlayer )
+	if ( Game.bMegaSpeed && Other.bIsPawn && Pawn(Other).bIsPlayer )
 	{
 		Pawn(Other).GroundSpeed *= 1.4;
 		Pawn(Other).WaterSpeed *= 1.4;
