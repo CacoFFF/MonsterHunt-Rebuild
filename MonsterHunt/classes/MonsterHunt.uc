@@ -16,7 +16,10 @@ var bool bCheckEndLivesAgain;
 var() config name MonsterKillType[10];
 var() config int MonsterKillScore[10];
 
+var string TimeOutMessage;
+
 var MonsterWaypoint WaypointList;
+var MonsterEnd EndList;
 var ScriptedPawn ReachableEnemy;
 
 //********************
@@ -150,7 +153,7 @@ function ScoreKill( Pawn Killer, Pawn Other)
 	if ( (Killer != None) && Killer.bIsPlayer && (Killer.PlayerReplicationInfo != None) && (ScriptedPawn(Other) != None) )
 	{
 		BroadcastMessage( Killer.GetHumanName() @ "killed" $ Other.GetHumanName());
-		For ( i=0 ; i<10 && (MonsterKillType[i] != '') )
+		For ( i=0 ; i<10 && (MonsterKillType[i] != '') ; i++ )
 			if ( Other.IsA(MonsterKillType[i]) )
 			{
 				bSpecialScore = true;
@@ -233,7 +236,7 @@ function TaskMonstersVsBot( Bot aBot)
 				if ( FRand() >= 0.35 )
 				{
 					aBot.GotoState('Attacking');
-					return False;
+					return;
 				}
 			}
 		}
@@ -245,7 +248,7 @@ function TaskMonstersVsBot( Bot aBot)
 				aBot.GotoState('Attacking');
 				S.Enemy = aBot;
 				S.GotoState('Attacking');
-				return False;
+				return;
 			}
 		}
 	}
@@ -390,7 +393,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 					}
 					
 					//We changed objectives, change attraction point
-					if ( BestW = W )
+					if ( BestW == W )
 						NewDest = aBot.MoveTarget;
 				}
 			}
@@ -484,6 +487,13 @@ function int CountHunters_XC()
 	return i;
 }
 
+//MonsterEnd chainer
+function RegisterEnd( MonsterEnd Other)
+{
+	Other.NextEnd = EndList;
+	EndList = Other;
+}
+
 //Waypoint chainer
 function RegisterWaypoint( MonsterWaypoint Other)
 {
@@ -521,7 +531,7 @@ function UnregisterWaypoint( MonsterWaypoint Other)
 	local MonsterWaypoint MW;
 
 	if ( Other == WaypointList )
-		WaypointList = Other.WaypointList;
+		WaypointList = Other.NextWaypoint;
 	else
 	{
 		For ( MW=WaypointList ; MW!=None ; MW=MW.NextWaypoint )
