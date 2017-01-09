@@ -257,6 +257,36 @@ function TaskMonstersVsBot( Bot aBot)
 }
 function TaskMonstersVsBot_XC( Bot aBot);
 
+//Nearby hunters
+function int NearbyTeammates( Pawn Other, float Distance, bool bVisible)
+{
+	local Pawn P;
+	local int i;
+	
+	ForEach Other.RadiusActors ( class'Pawn', P, Distance)
+	{
+		if ( P.PlayerReplicationInfo == None || P.PlayerReplicationInfo.Team != Other.PlayerReplicationInfo.Team || P == Other )
+			continue;
+		if ( bVisible && !Other.FastTrace(P.Location + VRand() * P.CollisionRadius) )
+			continue;
+		i++;
+	}
+	return i;
+}
+function int NearbyTeammates_XC( Pawn Other, float Distance, bool bVisible)
+{
+	local Pawn P;
+	local int i;
+	
+	ForEach PawnActors (class'Pawn', P, Distance, Other.Location, true)
+	{
+		if ( P.PlayerReplicationInfo.Team != Other.PlayerReplicationInfo.Team || (bVisible && !Other.FastTrace(P.Location + VRand()*P.CollisionRadius) ) )
+			continue;
+		i++;
+	}
+	return i;
+}
+
 
 //Sets MoveTarget on pawn
 //Can be called recursively once
@@ -352,11 +382,20 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	{
 		BotID = aBot.PlayerReplicationInfo.PlayerID + Asc(aBot.PlayerReplicationInfo $ "A");
 		BotState = BotID + Level.TimeSeconds * 0.5;
-		Limit = 2 + int(aBot.Orders == 'Attack')*2 + int(aBot.Enemy == None)*2 + int(aBot.Weapon != none && aBot.Weapon.AiRating > 0.5)*2;
+
+		//The more conditions, the more the bot is likely to charge
+		Limit = 3
+		+ int(aBot.Orders == 'Attack')
+		+ int(aBot.Enemy == None) * 2
+		+ int(aBot.Weapon != none && aBot.Weapon.AiRating > 0.4 + FRand() * 0.2) * 2
+		+ int(aBot.Health > 60)
+		+ aBot.Health/150
+		+ NearbyTeammates(aBot, 500+aBot.Health, aBot.Enemy!=None) / 2;
+
 		BotState = BotState % Limit;
 		//3 seconds for inventory grabbing
 		if ( BotState < 1.5 ) 
-			return False;
+			return True;
 		//8 seconds prioritizing monsters
 		if ( aBot.Enemy != None && (BotState < 4) )
 		{
