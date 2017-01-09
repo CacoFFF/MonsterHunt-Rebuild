@@ -395,7 +395,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		BotState = BotState % Limit;
 		//3 seconds for inventory grabbing
 		if ( BotState < 1.5 ) 
-			return True;
+			return False;
 		//8 seconds prioritizing monsters
 		if ( aBot.Enemy != None && (BotState < 4) )
 		{
@@ -418,7 +418,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 			{
 				if ( Limit <= 0 )
 					Limit = W.Position;
-				else if ( W.Position > Limit-2 ) //Don't seek past next 2 objectives (speed reasons, game reasons, etc)
+				else if ( W.Position > Limit+2 ) //Don't seek past next 2 objectives (speed reasons, game reasons, etc)
 					return False;
 				if ( AttractTo(aBot,W) ) //Only query reachable objectives
 				{
