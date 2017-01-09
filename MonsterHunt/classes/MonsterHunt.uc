@@ -419,7 +419,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 				if ( Limit <= 0 )
 					Limit = W.Position;
 				else if ( W.Position > Limit+2 ) //Don't seek past next 2 objectives (speed reasons, game reasons, etc)
-					return False;
+					break;
 				if ( AttractTo(aBot,W) ) //Only query reachable objectives
 				{
 					if ( BestW == None ) //Get first one
@@ -448,8 +448,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 			Goto ATTRACT_DEST;
 		}
 
-		
-		ForEach AllActors( Class'MonsterEnd', E)
+		For ( E=EndList ; E!=None ; E=E.NextEnd )
 			if ( E.bCollideActors && AttractTo(aBot, E) )
 			{
 				NewDest = aBot.MoveTarget; //Jumping outside a ForEach iterator is very ugly, avoid it
