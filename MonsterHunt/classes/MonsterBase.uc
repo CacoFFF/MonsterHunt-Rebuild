@@ -113,7 +113,7 @@ defaultproperties
 	UIWeaponReplacement(3)="MonsterHunt.OLASMD"
 	UIWeaponReplacement(4)="MonsterHunt.OLEightball"
 	UIWeaponReplacement(5)="MonsterHunt.OLFlakCannon"
-	UIWeaponReplacement(6)="MonsterHunt.OLRajorjack"
+	UIWeaponReplacement(6)="MonsterHunt.OLRazorjack"
 	UIWeaponReplacement(7)="MonsterHunt.OLGESBioRifle"
 	UIWeaponReplacement(8)="MonsterHunt.OLRifle"
 	UIWeaponReplacement(9)="MonsterHunt.OLMinigun"

@@ -124,7 +124,7 @@ function bool IsRelevant( Actor Other)
 	if ( Other.bIsPawn )
 		bCountMonstersAgain = true;
 	Result = Super.IsRelevant( Other);
-	if ( ScriptedPawn(Other) != None && !bSkipThisMonster )
+	if ( (ScriptedPawn(Other) != None) && Result && !bSkipThisMonster )
 		SetPawnDifficulty( MonsterSkill, ScriptedPawn(Other) );
 	bSkipThisMonster = false;
 	return Result;
