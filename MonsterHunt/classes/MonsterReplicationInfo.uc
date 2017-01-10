@@ -6,6 +6,7 @@ class MonsterReplicationInfo expands TournamentGameReplicationInfo;
 var int Lives;
 var int Monsters;
 var int Hunters;
+var PlayerPawn LocalPlayer;
 
 replication
 {
@@ -15,6 +16,8 @@ replication
 
 simulated function Timer()
 {
+	local ScriptedPawn P;
+	
 	Super.Timer();
 	if ( Level.NetMode != NM_Client )
 	{
@@ -27,5 +30,8 @@ simulated function Timer()
 		}
 		if ( MonsterHunt(Level.Game).bCheckEndLivesAgain )
 			MonsterHunt(Level.Game).CheckEndGame();
+	}
+	else
+	{
 	}
 }

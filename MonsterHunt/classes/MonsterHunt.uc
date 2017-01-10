@@ -11,6 +11,7 @@ var() config bool bReplaceUIWeapons;
 
 var bool bCountMonstersAgain; //Monster counting isn't immediate, helps other mutators properly affect monsters before we do it
 var bool bCheckEndLivesAgain;
+var bool bSkipThisMonster; //Mutator doesn't want this monster to be difficulty-scaled
 
 //User-define kill scores
 var() config name MonsterKillType[10];
@@ -119,9 +120,14 @@ function bool RestartPlayer( Pawn aPlayer)
 //If a pawn is spawned, let game we want to count all monsters again
 function bool IsRelevant( Actor Other)
 {
+	local bool Result;
 	if ( Other.bIsPawn )
 		bCountMonstersAgain = true;
-	return Super.IsRelevant( Other);
+	Result = Super.IsRelevant( Other);
+	if ( ScriptedPawn(Other) != None && !bSkipThisMonster )
+		SetPawnDifficulty( MonsterSkill, ScriptedPawn(Other) );
+	bSkipThisMonster = false;
+	return Result;
 }
 
 function bool ChangeTeam(Pawn Other, int NewTeam)
@@ -218,8 +224,6 @@ function SetPawnDifficulty( int Diff, ScriptedPawn S)
 		}
 	}
 
-	if ( S.Shadow == None )
-		S.Shadow = Spawn( Class'MonsterShadow', S);
 }
 
 function TaskMonstersVsBot( Bot aBot)
@@ -256,6 +260,7 @@ function TaskMonstersVsBot( Bot aBot)
 	}
 }
 function TaskMonstersVsBot_XC( Bot aBot);
+
 
 //Nearby hunters
 function int NearbyTeammates( Pawn Other, float Distance, bool bVisible)
@@ -400,7 +405,11 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		if ( aBot.Enemy != None && (BotState < 4) )
 		{
 			if ( AttractTo( aBot, aBot.Enemy) )
+			{
+				if ( aBot.MoveTarget == aBot.Enemy ) //Don't charge
+					return False;
 				Goto ATTRACT_DEST;
+			}
 		}
 		
 		//Otherwise prioritize the main objectives (sorted by priority)
@@ -449,7 +458,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		}
 
 		For ( E=EndList ; E!=None ; E=E.NextEnd )
-			if ( E.bCollideActors && AttractTo(aBot, E) )
+			if ( E.bCollideActors && E.bInitiallyActive && AttractTo(aBot, E) )
 			{
 				NewDest = aBot.MoveTarget; //Jumping outside a ForEach iterator is very ugly, avoid it
 				break;
@@ -487,7 +496,7 @@ function int CountMonsters()
 		{
 			i++; //Ignore friendly monsters?
 			if ( P.Shadow == None )
-				ProcessMonster( ScriptedPawn(P));
+				P.Shadow = Spawn( Class'MonsterShadow', P);
 		}
 	return i;
 }
@@ -500,7 +509,7 @@ function int CountMonsters_XC()
 	{
 		i++; //Ignore friendly monsters?
 		if ( S.Shadow == None )
-			ProcessMonster( S);
+			S.Shadow = Spawn( Class'MonsterShadow', S);
 	}
 	return i;
 }
@@ -658,6 +667,7 @@ defaultproperties
 	TimeLimit=30
 	MutatorClass=Class'MonsterBase'
 	DefaultWeapon=Class'Botpack.ChainSaw'
+	MapListType=Class'MonsterMapList'
 	GameReplicationInfoClass=Class'MonsterReplicationInfo'
 	MapPrefix="MH"
 	BeaconName="MH"
