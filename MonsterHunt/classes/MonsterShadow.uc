@@ -8,9 +8,7 @@ var MonsterShadow NextShadow;
 
 event PostBeginPlay()
 {
-	if ( Level.NetMode == NM_DedicatedServer )
-		InitialState = 'DedicatedServer';
-	else if ( Owner != None )
+	if ( Owner != None )
 		SetupFor( Owner);
 	Super.PostBeginPlay();
 }

@@ -21,11 +21,14 @@ var string TimeOutMessage;
 
 var MonsterWaypoint WaypointList;
 var MonsterEnd EndList;
+var MonsterAuthenticator AuthenticatorList;
 var ScriptedPawn ReachableEnemy;
 
 //********************
 // XC_Core / XC_Engine
 native(3540) final iterator function PawnActors( class<Pawn> PawnClass, out pawn P, optional float Distance, optional vector VOrigin, optional bool bHasPRI, optional Pawn StartAt);
+native(3560) static final function bool ReplaceFunction( class<Object> ReplaceClass, class<Object> WithClass, name ReplaceFunction, name WithFunction, optional name InState);
+native(3561) static final function bool RestoreFunction( class<Object> RestoreClass, name RestoreFunction, optional name InState);
 
 
 event InitGame(string Options, out string Error)
@@ -34,6 +37,12 @@ event InitGame(string Options, out string Error)
 	bUseTranslocator = False; //Warning: TranslocDest points will be unlinked with this
 	bNoMonsters = False;
 	MaxAllowedTeams = 1;
+	
+	
+	if ( int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 19 )
+	{
+		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'TaskMonstersVsBot', 'TaskMonstersVsBot_XC');
+	}
 	
 	Super.InitGame( Options, Error);
 	
@@ -495,7 +504,7 @@ function int CountMonsters()
 		if ( P.IsA('ScriptedPawn') )
 		{
 			i++; //Ignore friendly monsters?
-			if ( P.Shadow == None )
+			if ( P.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
 				P.Shadow = Spawn( Class'MonsterShadow', P);
 		}
 	return i;
@@ -508,7 +517,7 @@ function int CountMonsters_XC()
 	ForEach PawnActors (class'ScriptedPawn', S)
 	{
 		i++; //Ignore friendly monsters?
-		if ( S.Shadow == None )
+		if ( S.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
 			S.Shadow = Spawn( Class'MonsterShadow', S);
 	}
 	return i;
