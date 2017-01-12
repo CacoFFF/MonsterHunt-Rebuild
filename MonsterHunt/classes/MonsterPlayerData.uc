@@ -13,6 +13,8 @@ var PlayerReplicationInfo PRI;
 var int PlayerID;
 var int MonsterKills;
 var int ObjectivesTaken;
+var int Health;
+var int Armor;
 var float AccDamage;
 var float FullDamage;
 

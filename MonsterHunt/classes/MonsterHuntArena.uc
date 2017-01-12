@@ -7,22 +7,7 @@ class MonsterHuntArena extends MonsterHunt
 var() config float WeaponRespawnTime;
 var() config float AmmoRespawnTime;
 
-//If a pawn is spawned, let game we want to count all monsters again
-function bool IsRelevant( Actor Other)
-{
-	local bool Result;
-	local Inventory Inv;
-	
-	Result = Super.IsRelevant( Other);
-	if ( Result && (Inventory(Other) != None) && (Inventory(Other).RespawnTime > 0) )
-	{
-		if ( Other.IsA('Weapon') )
-			Weapon(Other).RespawnTime = WeaponRespawnTime;
-		else if ( Other.IsA('Ammo') )
-			Ammo(Other).RespawnTime = AmmoRespawnTime;
-	}
-	return Result;
-}
+
 
 defaultproperties
 {

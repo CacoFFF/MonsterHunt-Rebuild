@@ -18,6 +18,10 @@ function AddMutator( Mutator M)
 	Super.AddMutator(M);
 }
 
+function PreCacheReferences()
+{
+	Spawn(class'RockTentacleCarcass');
+}
 
 function PostBeginPlay()
 {
@@ -45,6 +49,7 @@ function PostBeginPlay()
 		ConsoleCommand("Set WoodenBox NetUpdateFrequency 15");
 		ConsoleCommand("Set TorchFlame NetUpdateFrequency 0.5"); //DMMutator
 	}
+	ConsoleCommand("Set Tentacle CarcassType RockTentacleCarcass"); //Fix tentacle carcasses with custom skins
 
 	Super.PostBeginPlay();
 }
@@ -55,6 +60,8 @@ function PostBeginPlay()
 function bool CheckReplacement( Actor Other, out byte bSuperRelevant)
 {
 	local Inventory Inv;
+	local Actor A;
+	local ScriptedPawn S;
 	local int i;
 
 	bSuperRelevant = 1;
@@ -71,6 +78,8 @@ function bool CheckReplacement( Actor Other, out byte bSuperRelevant)
 	{
 		if ( Other.IsA('Weapon') )
 		{
+			if ( (Inv.RespawnTime > 0) && Game.IsA('MonsterHuntArena') )
+				Inv.RespawnTime = MonsterHuntArena(Game).WeaponRespawnTime;
 			if ( Other.IsA('TournamentWeapon') || !Game.bReplaceUIWeapons )
 				return True;
 			For ( i=0 ; i<10 ; i++ )
@@ -84,6 +93,8 @@ function bool CheckReplacement( Actor Other, out byte bSuperRelevant)
 		}
 		if ( Other.IsA('Pickup') )
 		{
+			if ( Other.IsA('Ammo') && (Inv.RespawnTime > 0) && Game.IsA('MonsterHuntArena') )
+				Inv.RespawnTime = MonsterHuntArena(Game).AmmoRespawnTime;
 			Pickup(Other).bAutoActivate = True;
 			if ( Other.IsA('TournamentPickup') || Other.IsA('TournamentHealth') )
 				return True;

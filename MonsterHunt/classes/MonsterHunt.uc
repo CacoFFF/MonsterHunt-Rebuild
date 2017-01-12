@@ -467,7 +467,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		}
 
 		For ( E=EndList ; E!=None ; E=E.NextEnd )
-			if ( E.bCollideActors && E.bInitiallyActive && AttractTo(aBot, E) )
+			if ( /*E.bCollideActors && E.bInitiallyActive &&*/ AttractTo(aBot, E) )
 			{
 				NewDest = aBot.MoveTarget; //Jumping outside a ForEach iterator is very ugly, avoid it
 				break;
@@ -635,7 +635,7 @@ function AddToTeam( int num, Pawn Other )
 			}
 	}
 
-	BroadcastLocalizedMessage( DMMessageClass, 3, Other.PlayerReplicationInfo, None, aTeam );
+//	BroadcastLocalizedMessage( DMMessageClass, 3, Other.PlayerReplicationInfo, None, aTeam );
 
 	Other.static.GetMultiSkin(Other, SkinName, FaceName);
 	Other.static.SetMultiSkin(Other, SkinName, FaceName, num);
@@ -677,6 +677,7 @@ defaultproperties
 	MutatorClass=Class'MonsterBase'
 	DefaultWeapon=Class'Botpack.ChainSaw'
 	MapListType=Class'MonsterMapList'
+	HUDType=Class'MonsterHUD'
 	GameReplicationInfoClass=Class'MonsterReplicationInfo'
 	MapPrefix="MH"
 	BeaconName="MH"
