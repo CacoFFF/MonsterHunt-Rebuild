@@ -4,6 +4,8 @@
 class MonsterHUD expands ChallengeTeamHUD
 	config(User);
 	
+#exec TEXTURE IMPORT NAME=HUDIcon FILE=pcx\HUDIcon.pcx GROUP="HUD"
+	
 var Pawn LastStatusPawn;
 var Texture CachedDoll;
 var Texture CachedBelt;
@@ -68,7 +70,7 @@ function DrawGameSynopsis( Canvas Canvas)
 	if ( MonsterReplicationInfo(PlayerOwner.GameReplicationInfo).Lives > 0 )
 	{
 		Canvas.SetPos(0.0, YOffset);
-		Canvas.DrawText(" Lives: " $ string(int(PawnOwner.PlayerReplicationInfo.Deaths)), false);
+		Canvas.DrawText(" Lives: " $ string(MonsterReplicationInfo(PlayerOwner.GameReplicationInfo).Lives-int(PawnOwner.PlayerReplicationInfo.Deaths)), false);
     }
 	Canvas.SetPos(0, YOffset += YL);
 	Canvas.DrawText(" Hunters: " $ string(MonsterReplicationInfo(PlayerOwner.GameReplicationInfo).Hunters), false);
@@ -282,6 +284,14 @@ simulated function DrawStatus(Canvas Canvas)
 	}
 	Canvas.SetPos(X, Y);
 	Canvas.DrawTile(Texture'BotPack.HudElements1', 128*Scale, 64*Scale, 0, 192, 128.0, 64.0);
+
+	//MH panel
+	if ( !bHideStatus || !bHideAllWeapons )
+		Canvas.SetPos( X, 128.0 * Scale);
+	else
+		Canvas.SetPos( X, Y);
+	Canvas.DrawTile(Texture'MonsterHunt.HUD.HUDIcon', 128 * Scale, 64 * Scale, 0, 192, 128, 64);
+
 	Canvas.DrawColor = WhiteColor;
 	if ( bHideStatus )
 	{

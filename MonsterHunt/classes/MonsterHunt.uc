@@ -681,6 +681,7 @@ defaultproperties
 	GameReplicationInfoClass=Class'MonsterReplicationInfo'
 	MapPrefix="MH"
 	BeaconName="MH"
+	GameName="Monster Hunt"
 	LeftMessage=" left the hunt."
 	EnteredMessage=" has joined the hunt!"
 	StartUpMessage="Work with your teammates to hunt down the monsters!"

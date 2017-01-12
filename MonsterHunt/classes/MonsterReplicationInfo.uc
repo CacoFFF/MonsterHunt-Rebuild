@@ -3,6 +3,8 @@
 // Global info visible by clients
 class MonsterReplicationInfo expands TournamentGameReplicationInfo;
 
+var bool bUseLives; //Keep network compatibility with 503
+var const bool bUseTeamSkins; //Keep network compatibility with 503
 var int Lives;
 var int Monsters;
 var int Hunters;
@@ -14,7 +16,7 @@ var MonsterPlayerData InactiveDatas;
 replication
 {
 	reliable if ( ROLE==ROLE_Authority )
-		Lives, Monsters, Hunters;
+		bUseLives, bUseTeamSkins, Lives, Monsters, Hunters;
 }
 
 simulated function Timer()
@@ -26,6 +28,7 @@ simulated function Timer()
 	{
 		Hunters = MonsterHunt(Level.Game).CountHunters();
 		Lives = MonsterHunt(Level.Game).Lives;
+		bUseLives = Lives > 0;
 		if ( MonsterHunt(Level.Game).bCountMonstersAgain || (FRand() < 0.05) )
 		{
 			MonsterHunt(Level.Game).bCountMonstersAgain = false;
@@ -38,6 +41,16 @@ simulated function Timer()
 	{
 		//Later...
 	}
+}
+
+simulated event PostNetBeginPlay()
+{
+	local MonsterPlayerData MPD;
+
+	Super.PostNetBeginPlay();
+
+	ForEach AllActors( class'MonsterPlayerData', MPD)
+		LinkPlayerData( MPD);
 }
 
 //********************************************************

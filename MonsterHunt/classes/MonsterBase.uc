@@ -60,8 +60,6 @@ function PostBeginPlay()
 function bool CheckReplacement( Actor Other, out byte bSuperRelevant)
 {
 	local Inventory Inv;
-	local Actor A;
-	local ScriptedPawn S;
 	local int i;
 
 	bSuperRelevant = 1;
