@@ -33,11 +33,12 @@ native(3561) static final function bool RestoreFunction( class<Object> RestoreCl
 
 event InitGame(string Options, out string Error)
 {
+	local Mutator M;
+
 	//Force settings
 	bUseTranslocator = False; //Warning: TranslocDest points will be unlinked with this
 	bNoMonsters = False;
 	MaxAllowedTeams = 1;
-	
 	
 	if ( int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 19 )
 	{
@@ -45,6 +46,14 @@ event InitGame(string Options, out string Error)
 	}
 	
 	Super.InitGame( Options, Error);
+
+	//Validate UI replacements of
+	For ( M=BaseMutator ; M!=None ; M=M.NextMutator )
+		if ( M.IsA('MonsterBase') )
+		{
+			MonsterBase(M).ValidateWeapons();
+			break;
+		}
 	
 	bCountMonstersAgain = true;
 }
@@ -53,7 +62,6 @@ event PostLogin( PlayerPawn NewPlayer )
 {
 	//Don't update player's Team in his URL
 	Super(DeathMatchPlus).PostLogin(NewPlayer);
-	CountHunters();
 	//Prevent monsters from attacking spectators
 	if ( NewPlayer.PlayerReplicationInfo != None && NewPlayer.PlayerReplicationInfo.bIsSpectator )
 	{
@@ -62,16 +70,6 @@ event PostLogin( PlayerPawn NewPlayer )
 	}
 }
 
-event PlayerPawn Login( string Portal, string Options, out string Error, Class<PlayerPawn> SpawnClass)
-{
-	local PlayerPawn NewPlayer;
-	local NavigationPoint StartSpot;
-
-	NewPlayer = Super.Login( Portal, Options, Error, SpawnClass);
-	if ( NewPlayer != None )
-		CountHunters();
-	return NewPlayer;
-}
 
 //Recont everything right after match starts
 function StartMatch()

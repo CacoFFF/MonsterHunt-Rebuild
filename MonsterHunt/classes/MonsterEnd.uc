@@ -71,7 +71,7 @@ function TakeDamage( int Damage, Pawn instigatedBy, vector HitLocation, vector M
 //Entry point from old MH
 function TriggerObjective()
 {
-	if ( MonsterHunt(Level.Game) != None )
+	if ( !Level.Game.bGameEnded && MonsterHunt(Level.Game) != None )
 		MonsterHunt(Level.Game).EndGame("Hunt Successfull!");
 }
 

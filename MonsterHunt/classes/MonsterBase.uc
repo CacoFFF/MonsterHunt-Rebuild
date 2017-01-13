@@ -1,11 +1,17 @@
 //***************************
 // MonsterBase
 // MonsterHunt's base mutator
-class MonsterBase expands Mutator;
+class MonsterBase expands Mutator
+	config(MonsterHunt);
 
 var MonsterHunt Game;
 var() name UIWeaponName[10];
 var() string UIWeaponReplacement[10];
+
+
+//XC_Engine
+native(1718) final function bool AddToPackageMap( optional string PkgName);
+native(1719) final function bool IsInPackageMap( optional string PkgName, optional bool bServerPackagesOnly); //Second parameter doesn't exist in 227!
 
 
 //Deny game breaking mutators
@@ -25,6 +31,7 @@ function PreCacheReferences()
 
 function PostBeginPlay()
 {
+	SaveConfig();
 	Game = MonsterHunt(Level.Game);
 	//Reduce amount of traces per second on servers
 	if ( Level.NetMode != NM_Standalone )
@@ -49,11 +56,37 @@ function PostBeginPlay()
 		ConsoleCommand("Set WoodenBox NetUpdateFrequency 15");
 		ConsoleCommand("Set TorchFlame NetUpdateFrequency 0.5"); //DMMutator
 	}
+	//Fix other bugs
 	ConsoleCommand("Set Tentacle CarcassType RockTentacleCarcass"); //Fix tentacle carcasses with custom skins
-
+	
 	Super.PostBeginPlay();
 }
 
+function ValidateWeapons()
+{
+	local int i, j, iP;
+	local string Added[10];
+
+	//If weapon cannot be loaded, remove from list
+	For ( i=0 ; i<10 ; i++ )
+		if ( DynamicLoadObject( UIWeaponReplacement[i], class'Class') == None )
+			UIWeaponReplacement[i] = "";
+	if ( (Level.NetMode != NM_Standalone) && (int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 13) )
+	{
+		For ( i=0 ; i<10 ; i++ )
+			if ( UIWeaponReplacement[i] != "" )
+			{
+				//Don't search for package linkers multiple times
+				For ( j=0 ; j<iP ; j++ )
+					if ( Added[j] == Left(UIWeaponReplacement[i], Len(Added[j])) )
+						Goto NO_ADD;
+				//Package not previously added
+				Added[iP] = Left( UIWeaponReplacement[i], InStr(UIWeaponReplacement[i],"."));
+				AddToPackageMap( Added[iP++] );
+				NO_ADD:
+			}
+	}
+}
 
 //MonsterHuntArena sets all weapon/ammo respawn time to 3.0
 
@@ -122,7 +155,7 @@ defaultproperties
 	UIWeaponReplacement(3)="MonsterHunt.OLASMD"
 	UIWeaponReplacement(4)="MonsterHunt.OLEightball"
 	UIWeaponReplacement(5)="MonsterHunt.OLFlakCannon"
-	UIWeaponReplacement(6)="MonsterHunt.OLRazorjack"
+	UIWeaponReplacement(6)="MonsterHunt.OLRazorJack"
 	UIWeaponReplacement(7)="MonsterHunt.OLGESBioRifle"
 	UIWeaponReplacement(8)="MonsterHunt.OLRifle"
 	UIWeaponReplacement(9)="MonsterHunt.OLMinigun"

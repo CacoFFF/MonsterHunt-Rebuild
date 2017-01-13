@@ -32,7 +32,7 @@ state() OtherTriggerTurnsOn
 
 function TriggerObjective()
 {
-	if ( MonsterHuntArena(Level.Game) != None )
+	if ( !Level.Game.bGameEnded && MonsterHuntArena(Level.Game) != None )
 		MonsterHuntArena(Level.Game).EndGame("Arena Cleared!");
 }
 
