@@ -6,7 +6,7 @@ class MonsterBase expands Mutator
 
 var MonsterHunt Game;
 var() name UIWeaponName[10];
-var() string UIWeaponReplacement[10];
+var() config string UIWeaponReplacement[10];
 
 
 //XC_Engine
