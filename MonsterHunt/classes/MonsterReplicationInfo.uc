@@ -8,6 +8,7 @@ var const bool bUseTeamSkins; //Keep network compatibility with 503
 var int Lives;
 var int Monsters;
 var int Hunters;
+var int BossCount, KilledBosses; //Boss counter
 var PlayerPawn LocalPlayer;
 
 var MonsterPlayerData DataHash[32];
@@ -16,7 +17,7 @@ var MonsterPlayerData InactiveDatas;
 replication
 {
 	reliable if ( ROLE==ROLE_Authority )
-		bUseLives, bUseTeamSkins, Lives, Monsters, Hunters;
+		bUseLives, bUseTeamSkins, Lives, Monsters, Hunters, BossCount, KilledBosses;
 }
 
 simulated function Timer()
@@ -26,13 +27,13 @@ simulated function Timer()
 	Super.Timer();
 	if ( Level.NetMode != NM_Client )
 	{
-		Hunters = MonsterHunt(Level.Game).CountHunters();
+		MonsterHunt(Level.Game).CountHunters();
 		Lives = MonsterHunt(Level.Game).Lives;
 		bUseLives = Lives > 0;
 		if ( MonsterHunt(Level.Game).bCountMonstersAgain || (FRand() < 0.05) )
 		{
 			MonsterHunt(Level.Game).bCountMonstersAgain = false;
-			Monsters = MonsterHunt(Level.Game).CountMonsters();
+			MonsterHunt(Level.Game).CountMonsters();
 		}
 		if ( MonsterHunt(Level.Game).bCheckEndLivesAgain )
 			MonsterHunt(Level.Game).CheckEndGame();

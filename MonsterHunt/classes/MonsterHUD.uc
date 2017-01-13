@@ -4,13 +4,58 @@
 class MonsterHUD expands ChallengeTeamHUD
 	config(User);
 	
-#exec TEXTURE IMPORT NAME=HUDIcon FILE=pcx\HUDIcon.pcx GROUP="HUD"
-	
+#exec TEXTURE IMPORT NAME=HUDIcon FILE=pcx\HUDIcon.pcx Mips=Off GROUP="HUD"
+#exec Texture Import File=pcx\HUD_sgBoots.pcx Name=HUD_sgBoots Mips=Off Group=HUD Flags=2
+#exec Texture Import File=pcx\HUD_UDamT.pcx Name=HUD_UDamT Mips=Off Group=HUD Flags=2
+#exec Texture Import File=pcx\HUD_UDamM.pcx Name=HUD_UDamM Mips=Off Group=HUD Flags=64
+#exec Texture Import File=pcx\HUD_Invis.pcx Name=HUD_Invis Mips=Off Group=HUD Flags=2
+#exec Texture Import File=pcx\HUD_Scuba.pcx Name=HUD_Scuba Mips=Off Group=HUD Flags=2
+#exec Texture Import File=pcx\HUD_DampenerON.pcx Name=HUD_DampenerON Mips=Off Group=HUD Flags=2
+#exec Texture Import File=pcx\HUD_DampenerOFF.pcx Name=HUD_DampenerOFF Mips=Off Group=HUD Flags=2
+#exec Texture Import File=pcx\HUD_DampenerModu.pcx Name=HUD_DampenerModu Mips=Off Group=HUD Flags=2
+
+
+var UDamage CachedAmp;
+var Dampener CachedDamp;	
 var Pawn LastStatusPawn;
 var Texture CachedDoll;
 var Texture CachedBelt;
+var float DecimalTimer;
+var float AddedYSynopsis;
+
 
 var color ProtectionColors[3];
+
+
+//Timer control
+simulated function Tick( float DeltaTime)
+{
+	Super.Tick( DeltaTime);
+	if ( (DecimalTimer += DeltaTime) >= 0.1 )
+	{
+		DecimalTimer -= 0.1;
+		TimerDecimal();
+	}
+}
+
+simulated function TimerDecimal()
+{
+	if ( Level.NetMode == NM_Client )
+	{
+		if ( (CachedDamp != None) && CachedDamp.bActive && (CachedDamp.Charge > 0) )
+		{
+			CachedDamp.Charge--;
+			PlayerOwner.SoundDampening = 0.1;
+		}
+		else if ( PlayerOwner.SoundDampening == 0.1 )
+			PlayerOwner.SoundDampening = 1.0;
+	}
+	if ( CachedAmp != None && CachedAmp.bActive && (CachedAmp.Charge > 0) )
+		CachedAmp.Charge--;
+}
+
+
+
 
 //Do not use team colors
 simulated function HUDSetup(Canvas Canvas)
@@ -51,6 +96,11 @@ function DrawGameSynopsis( Canvas Canvas)
 {
 	local float XL, YL;
 	local float XOffset, YOffset;
+	local MonsterReplicationInfo MRI;
+
+	MRI = MonsterReplicationInfo(PlayerOwner.GameReplicationInfo);
+	if ( PlayerOwner == None || MRI == None )
+		return;
 
 	Canvas.Font = MyFonts.GetBigFont(Canvas.ClipX);
 	Canvas.DrawColor = WhiteColor;
@@ -60,22 +110,26 @@ function DrawGameSynopsis( Canvas Canvas)
 	else
 	{
 		if ( HUDScale * WeaponScale * Canvas.ClipX <= Canvas.ClipX - 256 * Scale )
-			YOffset = Canvas.ClipY - 64 * Scale - YL * 3;
+			YOffset = Canvas.ClipY - 64 * Scale - YL * 4;
 		else
-			YOffset = Canvas.ClipY - 128 * Scale - YL * 3;
+			YOffset = Canvas.ClipY - 128 * Scale - YL * 4;
 	}
-	if ( PlayerOwner == None )
-		return;
+	YOffset -= AddedYSynopsis;
 
-	if ( MonsterReplicationInfo(PlayerOwner.GameReplicationInfo).Lives > 0 )
+	if ( MRI.Lives > 0 )
 	{
 		Canvas.SetPos(0.0, YOffset);
-		Canvas.DrawText(" Lives: " $ string(MonsterReplicationInfo(PlayerOwner.GameReplicationInfo).Lives-int(PawnOwner.PlayerReplicationInfo.Deaths)), false);
+		Canvas.DrawText(" Lives: " $ string(MRI.Lives-int(PawnOwner.PlayerReplicationInfo.Deaths)), false);
     }
 	Canvas.SetPos(0, YOffset += YL);
-	Canvas.DrawText(" Hunters: " $ string(MonsterReplicationInfo(PlayerOwner.GameReplicationInfo).Hunters), false);
+	Canvas.DrawText(" Hunters: " $ string(MRI.Hunters), false);
 	Canvas.SetPos(0, YOffset += YL);
-	Canvas.DrawText(" Monsters: " $ string(MonsterReplicationInfo(PlayerOwner.GameReplicationInfo).Monsters), false);
+	Canvas.DrawText(" Monsters: " $ string(MRI.Monsters), false);
+	if ( MRI.KilledBosses + MRI.BossCount > 0 )
+	{
+		Canvas.SetPos(0.0, YOffset += YL);
+		Canvas.DrawText(" Bosses: " $ string(MRI.KilledBosses) @"/"@ string( MRI.KilledBosses+MRI.BossCount), false);
+    }
 }
 
 simulated final function int GetProtIdx( name ProtType)
@@ -122,15 +176,18 @@ simulated function DrawStatus(Canvas Canvas)
 {
 	local float StatScale, Amount, OtherAmount, H1, H2, X, Y, DamageTime;
 	Local int i, j, k;
-	local int ThighArmor, ChestArmor, ShieldArmor, TotalArmor;
+	local int ThighArmor, ChestArmor, ShieldArmor, TotalArmor, CountJumps, CountInvis, CountScuba, CountAmp, CountDampener;
 	Local Inventory Inv;
-	local bool bJumpBoots, bHasDoll;
+	local bool bJumpBoots, bHasDoll, bActiveDamp;
 	local int KnownProtArmors[3]; //Corroded, Frozen, Burned, In that order
 	local int KnownProts[2];
+
+	local byte aStyle;
+	local float YOffset, WeapScale; //For items
 	
 	i = 0;
 	for( Inv=PawnOwner.Inventory; Inv!=None; Inv=Inv.Inventory )
-	{ 
+	{
 		if (Inv.bIsAnArmor) 
 		{
 			KnownProts[0] = GetProtIdx( Inv.ProtectionType1);
@@ -155,8 +212,32 @@ simulated function DrawStatus(Canvas Canvas)
 			}
 			TotalArmor += Inv.Charge;
 		}
-		else if ( Inv.IsA('UT_JumpBoots') || Inv.IsA('JumpBoots') )
-			bJumpBoots = true;
+		else if ( Inv.default.Charge > 0 ) //This check is faster that Weapon/Ammo class checks
+		{
+			if ( Inv.IsA('UT_JumpBoots') || Inv.IsA('JumpBoots') )
+			{
+				bJumpBoots = true;
+				CountJumps += Inv.Charge;
+			}
+			else if ( Inv.IsA('Invisibility') || Inv.IsA('UT_Invisibility') )
+				CountInvis += Inv.Charge;
+			else if ( Inv.IsA('SCUBAGear') )
+				CountScuba = Inv.Charge;
+			else if ( Inv.Isa('UDamage') )
+			{
+				if ( Inv.bActive )
+					CountAmp = Inv.Charge;
+				if ( PawnOwner == PlayerOwner ) //Cache this damage amplifier for charge alteration
+					CachedAmp = UDamage(Inv);
+			}
+			else if ( Inv.IsA('Dampener') )
+			{
+				CountDampener = Inv.Charge;
+				bActiveDamp = Inv.bActive;
+				if ( PawnOwner == PlayerOwner )
+					CachedDamp = Dampener(Inv);
+			}
+		}
 
 		if ( i++ > 100 )
 			break; // can occasionally get temporary loops in netplay
@@ -187,7 +268,6 @@ simulated function DrawStatus(Canvas Canvas)
 				Canvas.DrawColor.B = 0;
 				Canvas.SetPos(X, Amount*StatScale);
 				Canvas.DrawTile( CachedBelt, 128.0 * StatScale, (256.0 - Amount)*StatScale, 0, Amount, 128, 256-Amount );
-//				Canvas.DrawIcon(DollBelt, StatScale);
 			}
 			//Find highest special protections
 			if ( ChestArmor > 0 )
@@ -288,9 +368,8 @@ simulated function DrawStatus(Canvas Canvas)
 	//MH panel
 	if ( !bHideStatus || !bHideAllWeapons )
 		Canvas.SetPos( X, 128.0 * Scale);
-	else
-		Canvas.SetPos( X, Y);
 	Canvas.DrawTile(Texture'MonsterHunt.HUD.HUDIcon', 128 * Scale, 64 * Scale, 0, 192, 128, 64);
+	Canvas.SetPos( X, Y);
 
 	Canvas.DrawColor = WhiteColor;
 	if ( bHideStatus )
@@ -305,6 +384,149 @@ simulated function DrawStatus(Canvas Canvas)
 			Canvas.DrawColor = ProtectionColors[1];
 	}
 	DrawBigNum(Canvas, Min(999,TotalArmor), X + 4 * Scale, Y + 16 * Scale, 1);
+
+	///////////////////////////////////////////////////////////////////
+	//////////////////////// ITEM SETUP ///////////////////////////////
+	if ( bHideAllWeapons )
+		YOffset = Canvas.ClipY;
+	else if ( HudScale * WeaponScale * Canvas.ClipX <= Canvas.ClipX - 256 * Scale )
+		YOffset = Canvas.ClipY - 63.9*Scale;
+	else
+		YOffset = Canvas.ClipY - 127.9*Scale;
+	aStyle = Style;
+	if ( aStyle == ERenderStyle.STY_Normal )
+		aStyle = ERenderStyle.STY_Masked;
+	Canvas.Style = Style;
+	Canvas.Font = MyFonts.GetBigFont(Canvas.ClipX);
+	WeapScale = (Scale + WeaponScale * Scale) / 2;
+	Y = 63.9 * WeapScale;
+	AddedYSynopsis = 0;
+	
+	//////////////////////// JUMPBOOTS ////////////////////////////////
+	if ( bJumpBoots )
+	{
+		AddedYSynopsis += Y;
+		YOffset -= Y;
+		Canvas.DrawColor = HUDColor; //SolidHUDcolor?
+		Canvas.SetPos(0,YOffset);	
+		Canvas.DrawIcon(Texture'HUD_sgBoots', WeapScale);
+		Canvas.CurX = 5 * WeapScale;
+		Canvas.CurY = YOffset + Canvas.CurX;
+		Canvas.Style = ERenderStyle.STY_Normal;
+		if ( CountJumps > 0 )
+			Canvas.DrawColor = GoldColor;
+		else
+			Canvas.DrawColor = RedColor;
+		Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(CountJumps % 10), 0, 25.0, 64.0);
+		Canvas.Style = aStyle;
+	}
+
+	//////////////////////// INVISIBLE ////////////////////////////////
+	if ( CountInvis > 0 )
+	{
+		AddedYSynopsis += Y;
+		YOffset -= Y;
+		Canvas.DrawColor = HUDColor; //SolidHUDcolor?
+		Canvas.SetPos(0,YOffset);	
+		Canvas.DrawIcon(Texture'HUD_Invis', WeapScale);
+		Canvas.Style = ERenderStyle.STY_Normal;
+		Canvas.DrawColor = GoldColor;
+		j = CountInvis / 2;
+		if ( j >= 10 )
+		{
+			Canvas.SetPos( 79 * WeapScale, YOffset + 20 * WeapScale);
+			Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(j / 10), 0, 25.0, 64.0);
+		}
+		Canvas.SetPos( 96 * WeapScale, YOffset + 20 * WeapScale);
+		Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(j % 10), 0, 25.0, 64.0);
+		Canvas.Style = aStyle;
+	}
+	
+	//////////////////////// AMPLIFIER/////////////////////////
+	if ( CountAmp > 0 )
+	{
+		CountAmp /= 10;
+		AddedYSynopsis += Y;
+		YOffset -= Y;
+		Canvas.DrawColor = HUDColor; //SolidHUDcolor?
+		Canvas.SetPos(0,YOffset);	
+		Canvas.DrawIcon(Texture'HUD_UDamT', WeapScale);
+		Canvas.SetPos(0,YOffset);	
+		Canvas.Style = ERenderStyle.STY_Modulated;
+		Canvas.DrawIcon(Texture'HUD_UDamM', WeapScale);
+		Canvas.Style = ERenderStyle.STY_Normal;
+		Canvas.DrawColor = GoldColor;
+		if ( CountAmp >= 10 )
+		{
+			Canvas.SetPos( 79 * WeapScale, YOffset + 20 * WeapScale);
+			Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(CountAmp / 10), 0, 25.0, 64.0);
+		}
+		Canvas.SetPos( 96 * WeapScale, YOffset + 20 * WeapScale);
+		Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(CountAmp % 10), 0, 25.0, 64.0);
+		Canvas.Style = aStyle;
+	}
+	
+	//////////////////////// DAMPENER ////////////////////////
+	if ( CountDampener > 0 )
+	{
+		CountDampener /= 10;
+		AddedYSynopsis += Y;
+		YOffset -= Y;
+		Canvas.SetPos(0,YOffset);	
+		Canvas.Style = ERenderStyle.STY_Modulated;
+		Canvas.DrawColor = WhiteColor;
+		Canvas.DrawIcon(Texture'HUD_DampenerModu', WeapScale);
+		Canvas.SetPos(0,YOffset);	
+		Canvas.Style = ERenderStyle.STY_Translucent;
+		Canvas.DrawColor = HUDColor;
+		if ( bActiveDamp && (CountDampener > 0) )
+		{
+			Canvas.DrawIcon(Texture'HUD_DampenerON', WeapScale);
+			Canvas.DrawColor = GoldColor;
+		}
+		else
+		{
+			Canvas.DrawIcon(Texture'HUD_DampenerOFF', WeapScale);
+			Canvas.DrawColor = RedColor;
+		}
+		Canvas.Style = ERenderStyle.STY_Normal;
+		if ( CountDampener >= 10 )
+		{
+			Canvas.SetPos( 79 * WeapScale, YOffset + 20 * WeapScale);
+			Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(CountDampener / 10), 0, 25.0, 64.0);
+		}
+		Canvas.SetPos( 96 * WeapScale, YOffset + 20 * WeapScale);
+		Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(CountDampener % 10), 0, 25.0, 64.0);
+		Canvas.Style = aStyle;
+	}
+	
+	//////////////////////// SCUBAGEAR /////////////////////////
+	if ( CountScuba > 0 )
+	{
+		AddedYSynopsis += Y;
+		YOffset -= Y;
+		Canvas.DrawColor = HUDColor;
+		Canvas.SetPos(0,YOffset);	
+		Canvas.DrawIcon(Texture'HUD_Scuba', WeapScale);
+		CountScuba /= 10;
+		Canvas.DrawColor = GoldColor;
+		Canvas.Style = ERenderStyle.STY_Normal;
+		if ( CountScuba >= 10 )
+		{
+			if ( CountScuba >= 100 )
+			{
+				Canvas.SetPos( 62 * WeapScale, YOffset + 20 * WeapScale);
+				Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(CountScuba / 100), 0, 25.0, 64.0);
+				CountScuba -= (CountScuba/100)*100;
+			}
+			Canvas.SetPos( 79 * WeapScale, YOffset + 20 * WeapScale);
+			Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(CountScuba / 10), 0, 25.0, 64.0);
+		}
+		Canvas.SetPos( 96 * WeapScale, YOffset + 20 * WeapScale);
+		Canvas.DrawTile(Texture'BotPack.HudElements1', 17 * WeapScale, 36 * WeapScale, 25*(CountScuba % 10), 0, 25.0, 64.0);
+		Canvas.Style = aStyle;
+	}
+	
 }
 
 

@@ -43,6 +43,7 @@ event InitGame(string Options, out string Error)
 	if ( int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 19 )
 	{
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'TaskMonstersVsBot', 'TaskMonstersVsBot_XC');
+		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountMonsters', 'CountMonsters_XC');
 	}
 	
 	Super.InitGame( Options, Error);
@@ -165,6 +166,11 @@ function ScoreKill( Pawn Killer, Pawn Other)
 	local ScriptedPawn S;
 
 	bCountMonstersAgain = true;
+	if ( ScriptedPawn(Other) != None && ScriptedPawn(Other).bIsBoss && MonsterReplicationInfo(GameReplicationInfo) != None )
+	{
+		MonsterReplicationInfo(GameReplicationInfo).KilledBosses++;
+		MonsterReplicationInfo(GameReplicationInfo).BossCount--;
+	}
 	if ( (Killer != None) && Killer.bIsPlayer && (Killer.PlayerReplicationInfo != None) && (ScriptedPawn(Other) != None) )
 	{
 		BroadcastMessage( Killer.GetHumanName() @ "killed" $ Other.GetHumanName());
@@ -206,13 +212,20 @@ function SetPawnDifficulty( int Diff, ScriptedPawn S)
 	StrenghtScale = 80 + Diff * 10; //Strenght on the other side doesn't
 
 	//CombatStyle and Aggresiveness affect monster preference to charge or stay at a distance, do not alter
-	S.Health = int(float(S.Health) * float(StrenghtScale) * 0.01); //Avoid going over the 32 bit INT cap
+	if ( !S.bIsBoss && (S.Event != '') && (S.Health > 1500) ) //Count as boss
+	{
+		S.bIsBoss = true;
+		S.Health = int(float(S.Health) * (float(StrenghtScale) * 0.01 - 0.15 * S.Skill)); //Avoid increasing health over boss status
+	}
+	else
+		S.Health = int(float(S.Health) * float(StrenghtScale) * 0.01); //Avoid going over the 32 bit INT cap
+
 	S.SightRadius = S.SightRadius * SkillScale / 100;
 	S.RefireRate = S.RefireRate * SkillScale / 100;
 	S.ProjectileSpeed = S.ProjectileSpeed * SkillScale / 100;
-	S.GroundSpeed = S.GroundSpeed * StrenghtScale / 100;
-	S.AirSpeed = S.AirSpeed * StrenghtScale / 100;
-	S.WaterSpeed = S.WaterSpeed * StrenghtScale / 100;
+	S.GroundSpeed = S.GroundSpeed * SkillScale / 100;
+	S.AirSpeed = S.AirSpeed * SkillScale / 100;
+	S.WaterSpeed = S.WaterSpeed * SkillScale / 100;
 	
 	//Adjust damages generically
 	OtherDamages[0] = 'WhipDamage';
@@ -493,36 +506,52 @@ function ProcessMonster( ScriptedPawn S)
 }
 
 //Monster counter
-function int CountMonsters()
+function CountMonsters()
 {
-	local int i;
+	local int i, iB;
 	local Pawn P;
 	
 	For ( P=Level.PawnList ; P!=None ; P=P.NextPawn )
-		if ( P.IsA('ScriptedPawn') )
+		if ( P.IsA('ScriptedPawn') && (P.Health > 0) )
 		{
 			i++; //Ignore friendly monsters?
+			if ( ScriptedPawn(P).bIsBoss )
+				iB++;
 			if ( P.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
 				P.Shadow = Spawn( Class'MonsterShadow', P);
 		}
-	return i;
+	if ( MonsterReplicationInfo(GameReplicationInfo) != None )
+	{
+		MonsterReplicationInfo(GameReplicationInfo).Monsters = i;
+		MonsterReplicationInfo(GameReplicationInfo).BossCount = iB;
+	}
 }
-function int CountMonsters_XC()
+
+function CountMonsters_XC()
 {
-	local int i;
+	local int i, iB;
 	local ScriptedPawn S;
 
 	ForEach PawnActors (class'ScriptedPawn', S)
 	{
-		i++; //Ignore friendly monsters?
-		if ( S.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
-			S.Shadow = Spawn( Class'MonsterShadow', S);
+		if ( S.Health > 0 )
+		{
+			i++; //Ignore friendly monsters?
+			if ( S.bIsBoss )
+				iB++;
+			if ( S.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
+				S.Shadow = Spawn( Class'MonsterShadow', S);
+		}
 	}
-	return i;
+	if ( MonsterReplicationInfo(GameReplicationInfo) != None )
+	{
+		MonsterReplicationInfo(GameReplicationInfo).Monsters = i;
+		MonsterReplicationInfo(GameReplicationInfo).BossCount = iB;
+	}
 }
 
 //Hunter counter
-function int CountHunters()
+function CountHunters()
 {
 	local int i;
 	local PlayerReplicationInfo PRI;
@@ -530,9 +559,10 @@ function int CountHunters()
 	ForEach AllActors (class'PlayerReplicationInfo', PRI)
 		if ( PRI.Owner != None && !PRI.Owner.IsA('ScriptedPawn') && !PRI.bIsSpectator )
 			i++;
-	return i;
+	if ( MonsterReplicationInfo(GameReplicationInfo) != None )
+		MonsterReplicationInfo(GameReplicationInfo).Hunters = i;
 }
-function int CountHunters_XC()
+function CountHunters_XC()
 {
 	local int i;
 	local Pawn P;
@@ -540,7 +570,8 @@ function int CountHunters_XC()
 	ForEach PawnActors (class'Pawn', P,,, true)
 		if ( !P.IsA('ScriptedPawn') && !P.PlayerReplicationInfo.bIsSpectator )
 			i++;
-	return i;
+	if ( MonsterReplicationInfo(GameReplicationInfo) != None )
+		MonsterReplicationInfo(GameReplicationInfo).Hunters = i;
 }
 
 //MonsterEnd chainer
