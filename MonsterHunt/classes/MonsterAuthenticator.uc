@@ -51,6 +51,7 @@ state LocalAuth
 Begin:
 	Sleep( Level.TimeDilation * 0.5 * FRand() );
 	MonsterReplicationInfo(Level.Game.GameReplicationInfo).AuthFinished( self);
+	Sleep( Level.TimeDilation );
 	Destroy();
 }
 
@@ -134,6 +135,7 @@ event Destroyed()
 				Last.NextAuthenticator = NextAuthenticator;
 			else
 				MonsterHunt(Level.Game).AuthenticatorList = NextAuthenticator;
+			NextAuthenticator = None;
 			break;
 		}
 		Last = MA;

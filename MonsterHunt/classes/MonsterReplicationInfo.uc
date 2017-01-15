@@ -10,6 +10,7 @@ var int Monsters;
 var int Hunters;
 var int BossCount, KilledBosses; //Boss counter
 var PlayerPawn LocalPlayer;
+var Texture HuntersIcon;
 
 var MonsterPlayerData DataHash[32];
 var MonsterPlayerData InactiveDatas;
@@ -17,7 +18,7 @@ var MonsterPlayerData InactiveDatas;
 replication
 {
 	reliable if ( ROLE==ROLE_Authority )
-		bUseLives, bUseTeamSkins, Lives, Monsters, Hunters, BossCount, KilledBosses;
+		bUseLives, bUseTeamSkins, Lives, Monsters, Hunters, BossCount, KilledBosses, HuntersIcon;
 }
 
 simulated function Timer()
@@ -70,8 +71,9 @@ function AuthFinished( MonsterAuthenticator MA)
 	{
 		MPD = SpawnPlayerData( P.PlayerReplicationInfo);
 		MPD.MRI = self;
-		MPD.Activate( P.PlayerReplicationInfo, MA.FingerPrint);
 	}
+	MPD.Activate( P.PlayerReplicationInfo, MA.FingerPrint);
+	LinkPlayerData( MPD);
 	MPD.TeamSkin = MA.TeamSkin;
 }
 
@@ -148,4 +150,9 @@ simulated final function UnlinkPlayerData( MonsterPlayerData pData)
 		MPD.HashNext = InactiveDatas;
 		InactiveDatas = MPD;
 	}
+}
+
+defaultproperties
+{
+	HuntersIcon=Texture'Botpack.Icons.I_TeamN'
 }

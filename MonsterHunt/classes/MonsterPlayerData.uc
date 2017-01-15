@@ -12,11 +12,15 @@ var PlayerReplicationInfo PRI;
 //Public stats
 var int PlayerID;
 var int MonsterKills;
+var int BossKills;
 var int ObjectivesTaken;
 var int Health;
 var int Armor;
+var int ActiveTime;
 var float AccDamage;
 var float FullDamage;
+var string CountryPrefix;
+var Texture CachedFlag;
 
 //Recovery-related stats
 var float SavedScore;
@@ -26,15 +30,15 @@ var string FingerPrint;
 
 //Internal data
 var bool bAuthenticated;
-var int ActiveTime;
 var byte TeamSkin;
+var float SecondTimer;
 
 replication
 {
 	reliable if ( bNetInitial && Role==ROLE_Authority )
 		PlayerID;
 	reliable if ( Role==ROLE_Authority )
-		MonsterKills, FullDamage;
+		Health, Armor, MonsterKills, BossKills, FullDamage, CountryPrefix, ActiveTime;
 }
 
 //In clients this actor has to find the MRI
@@ -47,12 +51,18 @@ simulated event PostNetBeginPlay()
 	}
 }
 
+simulated function CacheFlag()
+{
+}
+
+
 function Activate( PlayerReplicationInfo NewPRI, string NewFingerPrint)
 {
 	HashNext = None;
 	bAuthenticated = True;
 	bAlwaysRelevant = True;
 	PRI = NewPRI;
+	PlayerID = PRI.PlayerID;
 	if ( FingerPrint == "" )
 		FingerPrint = NewFingerPrint;
 	else
@@ -65,7 +75,7 @@ function Activate( PlayerReplicationInfo NewPRI, string NewFingerPrint)
 		NewPRI.Deaths = SavedDeaths;
 	}
 	SetOwner( NewPRI.Owner);
-	SetTimer( Level.TimeDilation * FRand(), False);
+	SetTimer( 0.1 + Level.TimeDilation * FRand(), False);
 }
 
 simulated function DeActivate()
@@ -85,9 +95,28 @@ simulated event Destroyed()
 		DeActivate();
 }
 
+event Tick( float DeltaTime)
+{
+	if ( (SecondTimer+=DeltaTime) > 0 )
+	{
+		SecondTimer -= Level.TimeDilation;
+		TimerSecond();
+	}
+}
+
+function TimerSecond()
+{
+	if ( bAuthenticated )
+	{
+		ActiveTime++;
+	}
+}
+
+
 event Timer()
 {
-	if ( PRI == None || PRI.bDeleteMe )
+	local Inventory Inv;
+	if ( PRI == None || PRI.bDeleteMe || PRI.Owner == None || PRI.Owner.bDeleteMe )
 		DeActivate();
 	else
 	{
@@ -95,6 +124,11 @@ event Timer()
 		SavedDeaths = PRI.Deaths;
 		SavedName = PRI.PlayerName;
 		SetTimer( Level.TimeDilation * FRand(), False);
+		Health = Max(0,Pawn(PRI.Owner).Health);
+		Armor = 0;
+		For ( Inv=PRI.Owner.Inventory ; Inv!=None ; Inv=Inv.Inventory )
+			if ( Inv.bIsAnArmor )
+				Armor += Inv.Charge;
 	}
 }
 

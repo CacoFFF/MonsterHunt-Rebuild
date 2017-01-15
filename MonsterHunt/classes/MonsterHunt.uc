@@ -8,6 +8,8 @@ var() config int MonsterSkill; //0 to 7 in v1...
 var() config int Lives;
 var() config bool bUseTeamSkins;
 var() config bool bReplaceUIWeapons;
+var() config string HunterTeamName;
+var() config string HunterTeamIcon;
 
 var bool bCountMonstersAgain; //Monster counting isn't immediate, helps other mutators properly affect monsters before we do it
 var bool bCheckEndLivesAgain;
@@ -26,6 +28,7 @@ var ScriptedPawn ReachableEnemy;
 
 //********************
 // XC_Core / XC_Engine
+native(1718) final function bool AddToPackageMap( optional string PkgName);
 native(3540) final iterator function PawnActors( class<Pawn> PawnClass, out pawn P, optional float Distance, optional vector VOrigin, optional bool bHasPRI, optional Pawn StartAt);
 native(3560) static final function bool ReplaceFunction( class<Object> ReplaceClass, class<Object> WithClass, name ReplaceFunction, name WithFunction, optional name InState);
 native(3561) static final function bool RestoreFunction( class<Object> RestoreClass, name RestoreFunction, optional name InState);
@@ -34,7 +37,9 @@ native(3561) static final function bool RestoreFunction( class<Object> RestoreCl
 event InitGame(string Options, out string Error)
 {
 	local Mutator M;
-
+	local Texture T;
+	local string S;
+	
 	//Force settings
 	bUseTranslocator = False; //Warning: TranslocDest points will be unlinked with this
 	bNoMonsters = False;
@@ -42,11 +47,25 @@ event InitGame(string Options, out string Error)
 	
 	if ( int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 19 )
 	{
+		ReplaceFunction( class'MonsterScore', class'MonsterScore', 'GetCycles', 'GetCycles_XC');
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'TaskMonstersVsBot', 'TaskMonstersVsBot_XC');
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountMonsters', 'CountMonsters_XC');
 	}
 	
 	Super.InitGame( Options, Error);
+
+	//Initialize hunter team info, make sure icon is relevant
+	Teams[0].TeamName = HunterTeamName;
+	T = Texture( DynamicLoadObject(HunterTeamIcon,class'Texture') );
+	if ( T != None )
+	{
+		MonsterReplicationInfo(GameReplicationInfo).HuntersIcon = T;
+		if ( int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 11 )
+		{
+			S = Left(HunterTeamIcon, InStr(HunterTeamIcon,"."));
+			AddToPackageMap( S);
+		}
+	}
 
 	//Validate UI replacements of
 	For ( M=BaseMutator ; M!=None ; M=M.NextMutator )
@@ -55,7 +74,7 @@ event InitGame(string Options, out string Error)
 			MonsterBase(M).ValidateWeapons();
 			break;
 		}
-	
+
 	bCountMonstersAgain = true;
 }
 
@@ -637,10 +656,10 @@ function AddToTeam( int num, Pawn Other )
 	local bool bSuccess;
 	local string SkinName, FaceName;
 	local PlayerReplicationInfo PRI;
-
-	if ( Other == None )
+	
+	if ( Other == None || Other.PlayerReplicationInfo == None )
 		return;
-
+		
 	aTeam = Teams[0];
 	aTeam.Size++;
 	Other.PlayerReplicationInfo.Team = 0;
@@ -668,6 +687,7 @@ function AddToTeam( int num, Pawn Other )
 
 	Other.static.GetMultiSkin(Other, SkinName, FaceName);
 	Other.static.SetMultiSkin(Other, SkinName, FaceName, num);
+	CheckPlayerData( Other, num);
 }
 
 //Fix annoying spam
@@ -695,6 +715,29 @@ function ChangeName(Pawn Other, string S, bool bNameChange)
 	if (WorldLog != None)	WorldLog.LogNameChange(Other);
 }
 
+function CheckPlayerData( Pawn Other, int NewTeam)
+{
+	local MonsterPlayerData MPD;
+	local MonsterAuthenticator MA;
+	
+	MPD = MonsterReplicationInfo(GameReplicationInfo).GetPlayerData( Other.PlayerReplicationInfo.PlayerID);
+	if ( MPD != None )
+	{
+		MPD.TeamSkin = NewTeam;
+		return;
+	}
+	MA = GetAuthenticator(Other);
+	MA.TeamSkin = NewTeam;
+}
+
+function MonsterAuthenticator GetAuthenticator( Pawn Other)
+{
+	local MonsterAuthenticator M;
+	For ( M=AuthenticatorList ; M!=None ; M=M.NextAuthenticator )
+		if ( M.Owner == Other )
+			return M;
+	return Spawn(class'MonsterAuthenticator', Other);
+}
 
 defaultproperties
 {
@@ -706,10 +749,13 @@ defaultproperties
 	MutatorClass=Class'MonsterBase'
 	DefaultWeapon=Class'Botpack.ChainSaw'
 	MapListType=Class'MonsterMapList'
+	ScoreBoardType=Class'MonsterScore'
 	HUDType=Class'MonsterHUD'
 	GameReplicationInfoClass=Class'MonsterReplicationInfo'
 	MapPrefix="MH"
 	BeaconName="MH"
+	HunterTeamName="Hunters"
+	HunterTeamIcon="Botpack.Icons.I_TeamN"
 	GameName="Monster Hunt"
 	LeftMessage=" left the hunt."
 	EnteredMessage=" has joined the hunt!"
