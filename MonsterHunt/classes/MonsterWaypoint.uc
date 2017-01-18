@@ -18,6 +18,10 @@ var name TriggerEvent1;
 var name TriggerEvent2;
 var name TriggerEvent3;
 var name TriggerEvent4;
+var Actor TriggerActor1;
+var Actor TriggerActor2;
+var Actor TriggerActor3;
+var Actor TriggerActor4;
 
 event PostBeginPlay()
 {

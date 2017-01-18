@@ -256,12 +256,17 @@ function ShowScores(Canvas Canvas)
 			Canvas.CurYL = 0;
 			Canvas.DrawText("PI:"@aPRI.Ping@"ms | PL:"@aPRI.PacketLoss$"%", false); //Clear line = false, saves a StrLen call
 			// Country flag
-			if ( aMPD != None && aMPD.CachedFlag != None )
+			if ( aMPD != None )
 			{
-				Canvas.CurX += 45;
-				Canvas.CurY -= Canvas.CurYL;
-				Canvas.DrawColor = WhiteColor;
-				Canvas.DrawIcon( aMPD.CachedFlag, 16.0 / aMPD.CachedFlag.VSize);
+				if ( aMPD.Ip2C_Flag != None )
+				{
+					Canvas.CurX += 45;
+					Canvas.CurY -= Canvas.CurYL;
+					Canvas.DrawColor = WhiteColor;
+					Canvas.DrawIcon( aMPD.Ip2C_Flag, 16.0 / aMPD.Ip2C_Flag.VSize);
+				}
+				else if ( !aMPD.bFlagCached )
+					aMPD.CacheFlag();
 			}
 		}
 

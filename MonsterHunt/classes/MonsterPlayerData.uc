@@ -9,6 +9,7 @@ var MonsterPlayerData HashNext;
 var MonsterReplicationInfo MRI;
 var PlayerReplicationInfo PRI;
 
+
 //Public stats
 var int PlayerID;
 var int MonsterKills;
@@ -19,8 +20,6 @@ var int Armor;
 var int ActiveTime;
 var float AccDamage;
 var float FullDamage;
-var string CountryPrefix;
-var Texture CachedFlag;
 
 //Recovery-related stats
 var float SavedScore;
@@ -33,13 +32,25 @@ var bool bAuthenticated;
 var byte TeamSkin;
 var float SecondTimer;
 
+//IpToCountry
+var Actor Ip2C_Actor;
+var int Ip2C_CountDown;
+var string Ip2C_Prefix;
+var Texture Ip2C_Flag;
+var bool bFlagCached;
+
 replication
 {
 	reliable if ( bNetInitial && Role==ROLE_Authority )
 		PlayerID;
 	reliable if ( Role==ROLE_Authority )
-		Health, Armor, MonsterKills, BossKills, FullDamage, CountryPrefix, ActiveTime;
+		Health, Armor, MonsterKills, BossKills, FullDamage, Ip2C_Prefix, ActiveTime;
 }
+
+
+native(3540) final iterator function PawnActors( class<Pawn> PawnClass, out pawn P, optional float Distance, optional vector VOrigin, optional bool bHasPRI, optional Pawn StartAt);
+native(3553) final iterator function DynamicActors( class<actor> BaseClass, out actor Actor, optional name MatchTag );
+
 
 //In clients this actor has to find the MRI
 simulated event PostNetBeginPlay()
@@ -49,15 +60,28 @@ simulated event PostNetBeginPlay()
 		MRI.LinkPlayerData( self);
 		break;
 	}
+	bFlagCached = false;
 }
 
 simulated function CacheFlag()
 {
-}
+	local Texture Tex;
 
+	if ( bFlagCached || Ip2C_Prefix == "" || (Asc(Ip2C_Prefix) == 42) )
+		return;
+
+	Ip2C_Flag = Texture(DynamicLoadObject("CountryFlags2."$Ip2C_Prefix, class'Texture', true));
+	if ( Ip2C_Flag == None )
+		Ip2C_Flag = Texture(DynamicLoadObject("CountryFlags5."$Ip2C_Prefix, class'Texture', true));
+	if ( Ip2C_Flag == None )
+		Ip2C_Flag = Texture(DynamicLoadObject("CountryFlags3."$Ip2C_Prefix, class'Texture', true));
+	bFlagCached = true;
+}
 
 function Activate( PlayerReplicationInfo NewPRI, string NewFingerPrint)
 {
+	if ( bAuthenticated )
+		return;
 	HashNext = None;
 	bAuthenticated = True;
 	bAlwaysRelevant = True;
@@ -76,6 +100,7 @@ function Activate( PlayerReplicationInfo NewPRI, string NewFingerPrint)
 	}
 	SetOwner( NewPRI.Owner);
 	SetTimer( 0.1 + Level.TimeDilation * FRand(), False);
+	ResolveCountry();
 }
 
 simulated function DeActivate()
@@ -109,6 +134,8 @@ function TimerSecond()
 	if ( bAuthenticated )
 	{
 		ActiveTime++;
+		if ( (Ip2C_CountDown > 0) && (--Ip2C_CountDown == 0) )
+			ResolveCountry();
 	}
 }
 
@@ -132,19 +159,86 @@ event Timer()
 	}
 }
 
+//If Ip is previously cached then it'll work on first try
+//Otherwise let IpToCountry perform a query and try again in 15 seconds for cached version
+function ResolveCountry()
+{
+	local string Temp;
+
+	if ( PlayerPawn(Owner) == None || NetConnection(PlayerPawn(Owner).Player) == None || !FindIpToCountry() )
+		return;
+
+	bFlagCached = false;
+	if ( Ip2C_Prefix == "" )
+	{
+		Ip2C_Prefix = "*2";
+		Ip2C_CountDown = 15;
+QUERY:
+		Temp = PlayerPawn(Owner).GetPlayerNetworkAddress();
+		Temp = Ip2C_Actor.GetItemName( Left(Temp,InStr(Temp, ":")) );
+		if ( Temp ~= "!Disabled" ) //Don't try again
+			Ip2C_CountDown = 0;
+		else if ( Left( Temp, 1) != "!" )
+		{
+			Ip2C_Prefix = SelElem( Temp, 5);
+			if ( Ip2C_Prefix == "" ) //Unknown country?
+				Ip2C_CountDown = 0;
+		}
+	}
+	else if ( Ip2C_Prefix == "*2" )
+		Goto QUERY;
+}
+
+
+
+//******************************
+// Utilitary methods
+//******************************
+final function bool FindIpToCountry()
+{
+	if ( Ip2C_Actor != None )
+		return true;
+	ForEach AllActors( class'Actor', Ip2C_Actor, 'IpToCountry')
+		return true;
+}
+
+final function bool FindIpToCountry_XC()
+{
+	if ( Ip2C_Actor != None )
+		return true;
+	ForEach DynamicActors( class'Actor', Ip2C_Actor, 'IpToCountry')
+		return true;
+}
 
 event BroadcastMessage( coerce string Msg, optional bool bBeep, optional name Type )
 {
 	local PlayerReplicationInfo PRI;
 
-	if (Type == '')
-		Type = 'Event';
-
+	if (Type == '')	Type = 'Event';
 	ForEach AllActors( class'PlayerReplicationInfo', PRI)
 		if ( PlayerPawn(PRI.Owner) != None )
 			PlayerPawn(PRI.Owner).ClientMessage( Msg, Type, bBeep );
 }
 
+event BroadcastMessage_XC( coerce string Msg, optional bool bBeep, optional name Type )
+{
+	local PlayerPawn P;
+
+	if (Type == '')	Type = 'Event';
+	ForEach PawnActors ( class'PlayerPawn', P,,, true)
+		P.ClientMessage( Msg, Type, bBeep);
+}
+
+static final function string SelElem(string Str, int Elem)
+{
+	local int pos;
+	while( Elem--> 1 )
+		Str=Mid( Str, InStr(Str,":")+1);
+	pos = InStr(Str, ":");
+	if( pos != -1 )
+    	Str = Left( Str, pos);
+    return Str;
+}
 
 
 defaultproperties

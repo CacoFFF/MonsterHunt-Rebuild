@@ -3,7 +3,7 @@
 // All subclasses should also have their config in MonsterHunt.ini
 class MonsterHunt expands TeamGamePlus
 	config(MonsterHunt);
-	
+
 var() config int MonsterSkill; //0 to 7 in v1...
 var() config int Lives;
 var() config bool bUseTeamSkins;
@@ -50,6 +50,8 @@ event InitGame(string Options, out string Error)
 		ReplaceFunction( class'MonsterScore', class'MonsterScore', 'GetCycles', 'GetCycles_XC');
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'TaskMonstersVsBot', 'TaskMonstersVsBot_XC');
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountMonsters', 'CountMonsters_XC');
+		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'FindIpToCountry', 'FindIpToCountry_XC');
+		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'BroadcastMessage', 'BroadcastMessage_XC');
 	}
 	
 	Super.InitGame( Options, Error);
@@ -183,14 +185,18 @@ function ScoreKill( Pawn Killer, Pawn Other)
 	local int i;
 	local bool bSpecialScore;
 	local ScriptedPawn S;
+	local MonsterPlayerData MPD;
+	local MonsterReplicationInfo MRI;
 
 	bCountMonstersAgain = true;
-	if ( ScriptedPawn(Other) != None && ScriptedPawn(Other).bIsBoss && MonsterReplicationInfo(GameReplicationInfo) != None )
+	S = ScriptedPawn(Other);
+	MRI = MonsterReplicationInfo(GameReplicationInfo);
+	if ( (S != None) && S.bIsBoss && (MRI != None) )
 	{
-		MonsterReplicationInfo(GameReplicationInfo).KilledBosses++;
-		MonsterReplicationInfo(GameReplicationInfo).BossCount--;
+		MRI.KilledBosses++;
+		MRI.BossCount--;
 	}
-	if ( (Killer != None) && Killer.bIsPlayer && (Killer.PlayerReplicationInfo != None) && (ScriptedPawn(Other) != None) )
+	if ( (Killer != None) && Killer.bIsPlayer && (Killer.PlayerReplicationInfo != None) && (S != None) )
 	{
 		BroadcastMessage( Killer.GetHumanName() @ "killed" $ Other.GetHumanName());
 		For ( i=0 ; i<10 && (MonsterKillType[i] != '') ; i++ )
@@ -202,8 +208,14 @@ function ScoreKill( Pawn Killer, Pawn Other)
 			}
 		if ( !bSpecialScore )
 			Killer.PlayerReplicationInfo.Score += Sqrt( float(Other.default.Health) * 0.01 );
-		if ( ScriptedPawn(Other).bIsBoss )
+
+		if ( MRI != None ) MPD = MRI.GetPlayerData( Killer.PlayerReplicationInfo.PlayerID);
+		if ( MPD != None ) MPD.MonsterKills++;
+		if ( S.bIsBoss )
+		{
 			Killer.PlayerReplicationInfo.Score += 9;
+			if ( MPD != None ) MPD.BossKills++;
+		}
 	}
 	else
 	{
