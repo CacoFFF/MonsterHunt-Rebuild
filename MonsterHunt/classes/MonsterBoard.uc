@@ -3,7 +3,7 @@
 // by Sektor
 // Greatly optimized by Higor > now adapted to MH
 //=============================================================================
-class MonsterScore expands TournamentScoreBoard;
+class MonsterBoard expands TournamentScoreBoard;
 
 #exec TEXTURE IMPORT NAME=Shade FILE=pcx\Shade.PCX GROUP=ScoreBoard MIPS=OFF
 #exec TEXTURE IMPORT NAME=Shade2 FILE=pcx\Shade2.PCX GROUP=ScoreBoard MIPS=OFF
@@ -154,7 +154,6 @@ function ShowScores(Canvas Canvas)
 		Canvas.DrawPattern( getHeaderTexture[i], tableWidth , tableHeaderHeight , 1 );*/
 
 	//Header core icons
-	Canvas.DrawColor = BrightCyan;
 
 	if ( (HunterTeam != none) && (HunterTeam.TeamName != "") )
 		s = HunterTeam.TeamName;
@@ -166,6 +165,7 @@ function ShowScores(Canvas Canvas)
 	Canvas.StrLen( s,xLen,yLen);
 	if ( (xLen < 180) && (MRI != None) && (MRI.HuntersIcon != None) )
 	{
+		Canvas.DrawColor = White;
 		Canvas.DrawIcon( MRI.HuntersIcon, 32.0 / float(MRI.HuntersIcon.VSize) );
 		Canvas.SetPos( X+50, Y + 10);
 	}
@@ -175,6 +175,7 @@ function ShowScores(Canvas Canvas)
 		xLen -= 50;
 	}
 	Canvas.Style = ERenderStyle.STY_Normal;
+	Canvas.DrawColor = BrightCyan;
 	Canvas.DrawText( s);
 
 	//avgInfo
@@ -262,7 +263,7 @@ function ShowScores(Canvas Canvas)
 				{
 					Canvas.CurX += 45;
 					Canvas.CurY -= Canvas.CurYL;
-					Canvas.DrawColor = WhiteColor;
+					Canvas.DrawColor = White;
 					Canvas.DrawIcon( aMPD.Ip2C_Flag, 16.0 / aMPD.Ip2C_Flag.VSize);
 				}
 				else if ( !aMPD.bFlagCached )

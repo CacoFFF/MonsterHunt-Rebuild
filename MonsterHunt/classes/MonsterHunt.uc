@@ -47,9 +47,10 @@ event InitGame(string Options, out string Error)
 	
 	if ( int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 19 )
 	{
-		ReplaceFunction( class'MonsterScore', class'MonsterScore', 'GetCycles', 'GetCycles_XC');
+		ReplaceFunction( class'MonsterBoard', class'MonsterBoard', 'GetCycles', 'GetCycles_XC');
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'TaskMonstersVsBot', 'TaskMonstersVsBot_XC');
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountMonsters', 'CountMonsters_XC');
+		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountHunters', 'CountHunters_XC');
 		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'FindIpToCountry', 'FindIpToCountry_XC');
 		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'BroadcastMessage', 'BroadcastMessage_XC');
 	}
@@ -108,9 +109,11 @@ function CheckEndGame()
 	if ( bGameEnded || (Lives <= 0) )
 		return;
 		
+	bCheckEndLivesAgain = False;
+
 	//Task bots to attack?
 	ForEach AllActors( class'PlayerReplicationInfo', PRI)
-		if ( Spectator(PRI.Owner) != None )
+		if ( Spectator(PRI.Owner) == None )
 		{
 			if ( (PRI.Deaths > 0) && (PRI.Deaths >= Lives) )
 				KnockedOut++;
@@ -419,6 +422,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	local int Limit;
 	local int BotID;
 	local float BotState;
+	local bool bAttract;
 
 	if ( aBot.LastAttractCheck == Level.TimeSeconds )
 		return false;
@@ -480,7 +484,11 @@ function bool FindSpecialAttractionFor( Bot aBot)
 					Limit = W.Position;
 				else if ( W.Position > Limit+2 ) //Don't seek past next 2 objectives (speed reasons, game reasons, etc)
 					break;
-				if ( AttractTo(aBot,W) ) //Only query reachable objectives
+				if ( W.DeferTo != None )
+					bAttract = AttractTo( aBot, W.DeferTo, true);
+				else
+					bAttract = AttractTo( aBot, W);
+				if ( bAttract ) //Only query reachable objectives
 				{
 					if ( BestW == None ) //Get first one
 						BestW = W;
@@ -509,11 +517,20 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		}
 
 		For ( E=EndList ; E!=None ; E=E.NextEnd )
-			if ( /*E.bCollideActors && E.bInitiallyActive &&*/ AttractTo(aBot, E) )
+		{
+			if ( true/*E.bCollideActors && E.bInitiallyActive &&*/ )
 			{
-				NewDest = aBot.MoveTarget; //Jumping outside a ForEach iterator is very ugly, avoid it
-				break;
+				if ( E.DeferTo != None )
+					bAttract = AttractTo( aBot, E.DeferTo, true);
+				else
+					bAttract = AttractTo( aBot, E);
+				if ( bAttract )
+				{
+					NewDest = aBot.MoveTarget; //Jumping outside a ForEach iterator is very ugly, avoid it
+					break;
+				}
 			}
+		}
 		if ( NewDest != None )
 			Goto ATTRACT_DEST;
 	}
@@ -674,6 +691,7 @@ function AddToTeam( int num, Pawn Other )
 		
 	aTeam = Teams[0];
 	aTeam.Size++;
+	aTeam.TeamName = HunterTeamName;
 	Other.PlayerReplicationInfo.Team = 0;
 	Other.PlayerReplicationInfo.TeamName = aTeam.TeamName;
 	if ( Other.IsA('PlayerPawn') )
@@ -761,7 +779,7 @@ defaultproperties
 	MutatorClass=Class'MonsterBase'
 	DefaultWeapon=Class'Botpack.ChainSaw'
 	MapListType=Class'MonsterMapList'
-	ScoreBoardType=Class'MonsterScore'
+	ScoreBoardType=Class'MonsterBoard'
 	HUDType=Class'MonsterHUD'
 	GameReplicationInfoClass=Class'MonsterReplicationInfo'
 	MapPrefix="MH"

@@ -41,7 +41,7 @@ simulated function Timer()
 	}
 	else
 	{
-		//Later...
+		PlayerDataIntegrity();
 	}
 }
 
@@ -53,6 +53,31 @@ simulated event PostNetBeginPlay()
 
 	ForEach AllActors( class'MonsterPlayerData', MPD)
 		LinkPlayerData( MPD);
+}
+
+
+simulated function PlayerDataIntegrity()
+{
+	local MonsterPlayerData MPD, Last;
+	local int i;
+	local PlayerReplicationInfo PRI;
+
+	For ( i=0 ; i<32 ; i++ )
+		For ( MPD=DataHash[i] ; MPD!=None ; MPD=MPD.HashNext )
+		{
+			if ( (MPD.PlayerID % 32) != i )
+			{
+				//Unlink
+				if ( Last != None )
+					Last.HashNext = MPD.HashNext;
+				else
+					DataHash[i] = MPD.HashNext;
+				//Relink
+				LinkPlayerData( MPD);
+				break;
+			}
+			Last = MPD;
+		}
 }
 
 //********************************************************

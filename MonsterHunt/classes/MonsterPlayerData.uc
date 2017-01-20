@@ -31,6 +31,7 @@ var string FingerPrint;
 var bool bAuthenticated;
 var byte TeamSkin;
 var float SecondTimer;
+var int OldPlayerID;
 
 //IpToCountry
 var Actor Ip2C_Actor;
@@ -61,6 +62,7 @@ simulated event PostNetBeginPlay()
 		break;
 	}
 	bFlagCached = false;
+	OldPlayerID = PlayerID;
 }
 
 simulated function CacheFlag()

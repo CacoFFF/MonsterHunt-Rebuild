@@ -6,6 +6,7 @@ class MonsterEnd expands Trigger;
 #exec TEXTURE IMPORT NAME=MHEnd FILE=pcx\MHEnd.pcx
 
 var MonsterEnd NextEnd;
+var NavigationPoint DeferTo;
 
 function PostBeginPlay()
 {
