@@ -6,6 +6,7 @@ class MonsterHuntRules extends UTRulesCWindow;
 #exec OBJ LOAD FILE=..\System\UTMenu.u PACKAGE=UTMenu
 #exec Texture Import File=pcx\MHRulesBG.pcx Name=MHRulesBG Mips=Off Group=Rules
 
+var bool bMHInit;
 
 // Damage to score
 var UWindowEditControl DamageToScoreEdit;
@@ -23,6 +24,8 @@ function Created()
 	local int FFS;
 	local int ControlWidth, ControlLeft, ControlRight;
 	local int CenterWidth, CenterPos;
+
+	bMHInit = False;
 
 	ControlWidth = WinWidth/2.5;
 	ControlLeft = (WinWidth/2 - ControlWidth)/2;
@@ -62,14 +65,15 @@ function Created()
 	MSSlider.SetFont(F_Normal);
 
 	Initialized = True;
+	bMHInit = true;
 }
 
 
 
 
-function LoadCurrentValues ()
+function LoadCurrentValues()
 {
-	Super.LoadCurrentValues();
+//	Super.LoadCurrentValues();
 	TimeEdit.SetValue(string(Class<MonsterHunt>(BotmatchParent.GameClass).Default.TimeLimit));
 	if ( MaxPlayersEdit != None )
 		MaxPlayersEdit.SetValue(string(Class<MonsterHunt>(BotmatchParent.GameClass).Default.MaxPlayers));
@@ -147,12 +151,14 @@ function MSChanged()
 
 function FragChanged()
 {
-	Class<MonsterHunt>(BotmatchParent.GameClass).Default.Lives = int(FragEdit.GetValue());
+	if ( bMHInit )
+		Class<MonsterHunt>(BotmatchParent.GameClass).Default.Lives = int(FragEdit.GetValue());
 }
 
 function TourneyChanged()
 {
-	Class<MonsterHunt>(BotmatchParent.GameClass).Default.bUseTeamSkins = TourneyCheck.bChecked;
+	if ( bMHInit )
+		Class<MonsterHunt>(BotmatchParent.GameClass).Default.bUseTeamSkins = TourneyCheck.bChecked;
 }
 
 function TimeChanged()
