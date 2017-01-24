@@ -18,8 +18,7 @@ var int ObjectivesTaken;
 var int Health;
 var int Armor;
 var int ActiveTime;
-var float AccDamage;
-var float FullDamage;
+var int AccDamage;
 
 //Recovery-related stats
 var float SavedScore;
@@ -42,16 +41,20 @@ var bool bFlagCached;
 
 replication
 {
-	reliable if ( bNetInitial && Role==ROLE_Authority )
-		PlayerID;
 	reliable if ( Role==ROLE_Authority )
-		Health, Armor, MonsterKills, BossKills, FullDamage, Ip2C_Prefix, ActiveTime;
+		PlayerID, Health, Armor, MonsterKills, BossKills, Ip2C_Prefix, ActiveTime;
 }
 
 
 native(3540) final iterator function PawnActors( class<Pawn> PawnClass, out pawn P, optional float Distance, optional vector VOrigin, optional bool bHasPRI, optional Pawn StartAt);
 native(3553) final iterator function DynamicActors( class<actor> BaseClass, out actor Actor, optional name MatchTag );
 
+simulated event SetInitialState()
+{
+	if ( Level.NetMode == NM_Client )
+		InitialState = 'Client';
+	Super.SetInitialState();
+}
 
 //In clients this actor has to find the MRI
 simulated event PostNetBeginPlay()

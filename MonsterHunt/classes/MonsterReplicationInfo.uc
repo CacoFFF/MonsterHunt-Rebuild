@@ -6,7 +6,7 @@ class MonsterReplicationInfo expands TournamentGameReplicationInfo;
 var bool bUseLives; //Keep network compatibility with 503
 var const bool bUseTeamSkins; //Keep network compatibility with 503
 var int Lives;
-var int Monsters;
+var int Monsters, KilledMonsters;
 var int Hunters;
 var int BossCount, KilledBosses; //Boss counter
 var PlayerPawn LocalPlayer;
@@ -18,7 +18,7 @@ var MonsterPlayerData InactiveDatas;
 replication
 {
 	reliable if ( ROLE==ROLE_Authority )
-		bUseLives, bUseTeamSkins, Lives, Monsters, Hunters, BossCount, KilledBosses, HuntersIcon;
+		bUseLives, bUseTeamSkins, Lives, Monsters, Hunters, BossCount, KilledBosses, KilledMonsters, HuntersIcon;
 }
 
 simulated function Timer()

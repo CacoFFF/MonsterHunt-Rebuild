@@ -191,19 +191,20 @@ function ShowScores(Canvas Canvas)
 //	Canvas.DrawText("EFF:"@avgEff[i]$"%");
 
 	Canvas.Style = ERenderStyle.STY_Translucent;
-/*	Canvas.Font = Font'LEDFont2';
-	if ( sgGRI.Cores[i] != none )
-		s = string( int(sgGRI.Cores[i].Energy / sgGRI.Cores[i].MaxEnergy * 100));
-	else
-		s = "0";
-	Canvas.StrLen(s,xLen,yLen);
+	if ( (MRI != None) && (MRI.Teams[0] != None) )
+	{
+		Canvas.Font = PtsFont26;
+//		Canvas.Font = Font'LEDFont2';
+		s = string(MRI.KilledMonsters) @ "/" @ string(int(MRI.Teams[0].Score));
+		Canvas.StrLen(s,xLen,yLen);
 
-	Canvas.SetPos(X+tableWidth-xLen-42, Y+5 );
-	Canvas.DrawIcon(getIconTexture[i], 0.5 );
+//		Canvas.SetPos(X+tableWidth-xLen-42, Y+5 );
+//		Canvas.DrawIcon(getIconTexture[i], 0.5 );
 
-	Canvas.Style = ERenderStyle.STY_Normal;
-	Canvas.SetPos( X+tableWidth-xLen-5, Y + 5);
-	Canvas.DrawText(s);*/
+		Canvas.Style = ERenderStyle.STY_Normal;
+		Canvas.SetPos( X+tableWidth-xLen-5, Y + 5);
+		Canvas.DrawText(s);
+	}
 
 	for ( i=0; i<iPRI; i++)
 	{
@@ -283,11 +284,10 @@ function ShowScores(Canvas Canvas)
 			Canvas.DrawText("Objs:"$AlignToRight(aMPD.ObjectivesTaken), false);
 
 			// Draw Health and Armor
-			Time = Min( 255, 100 + aMPD.Health); //Retarded compiler
-			Canvas.DrawColor.R = byte(Time);
-			Time = Min( 200, aMPD.Health);
+			Time = Clamp( (aMPD.Health - 50)*2, 0, 255);
+			Canvas.DrawColor.R = 255 - byte(Time);
 			Canvas.DrawColor.G = byte(Time);
-			Canvas.DrawColor.B = Canvas.DrawColor.G;
+			Canvas.DrawColor.B = byte(Clamp((aMPD.Health-200) / 3, 0, 255));
 			Canvas.SetPos(X+xLen+paddingInfo+40, Y + 7);
 			Canvas.DrawText("HP: "@AlignToRight(aMPD.Health), false);
 

@@ -62,11 +62,16 @@ function PostBeginPlay()
 	Super.PostBeginPlay();
 }
 
+
 function ValidateWeapons()
 {
 	local int i, j, iP;
 	local string Added[10];
 
+	//Register as damage mutator after all other mutators did
+	//Allows more accuracy when it comes to measuring score to damage
+	Level.Game.RegisterDamageMutator( self);
+	
 	//If weapon cannot be loaded, remove from list
 	For ( i=0 ; i<10 ; i++ )
 		if ( DynamicLoadObject( UIWeaponReplacement[i], class'Class') == None )
@@ -136,6 +141,33 @@ function bool CheckReplacement( Actor Other, out byte bSuperRelevant)
 	bSuperRelevant = 0;
 	return True;
 }
+
+function MutatorTakeDamage( out int ActualDamage, Pawn Victim, Pawn InstigatedBy, out Vector HitLocation, out Vector Momentum, name DamageType)
+{
+	local MonsterPlayerData MPD;
+	local int Res;
+
+	//Pre-process all other damage first
+	if ( NextDamageMutator != None )
+		NextDamageMutator.MutatorTakeDamage( ActualDamage, Victim, InstigatedBy, HitLocation, Momentum, DamageType );
+		
+	//Monster being damaged by player, add score if possible
+	if ( (Game.DamageToScore > 0) && (InstigatedBy != None) && (InstigatedBy.PlayerReplicationInfo != None) && (ScriptedPawn(Victim) != None) )
+	{
+		MPD = MonsterReplicationInfo(Game.GameReplicationInfo).GetPlayerData( InstigatedBy.PlayerReplicationInfo.PlayerID);
+		if ( MPD != None )
+		{
+			Res = (MPD.AccDamage += ActualDamage) / Game.DamageToScore;
+			if ( Res > 0 )
+			{
+				InstigatedBy.PlayerReplicationInfo.Score += Res;
+				Game.Teams[0].Score += Res;
+				MPD.AccDamage -= Game.DamageToScore * Res;
+			}
+		}
+	}
+}
+
 
 defaultproperties
 {

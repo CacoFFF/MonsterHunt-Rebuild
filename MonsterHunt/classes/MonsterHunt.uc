@@ -8,6 +8,7 @@ var() config int MonsterSkill; //0 to 7 in v1...
 var() config int Lives;
 var() config bool bUseTeamSkins;
 var() config bool bReplaceUIWeapons;
+var() config int DamageToScore;
 var() config string HunterTeamName;
 var() config string HunterTeamIcon;
 
@@ -37,8 +38,6 @@ native(3561) static final function bool RestoreFunction( class<Object> RestoreCl
 event InitGame(string Options, out string Error)
 {
 	local Mutator M;
-	local Texture T;
-	local string S;
 	
 	//Force settings
 	bUseTranslocator = False; //Warning: TranslocDest points will be unlinked with this
@@ -57,20 +56,7 @@ event InitGame(string Options, out string Error)
 	
 	Super.InitGame( Options, Error);
 
-	//Initialize hunter team info, make sure icon is relevant
-	Teams[0].TeamName = HunterTeamName;
-	T = Texture( DynamicLoadObject(HunterTeamIcon,class'Texture') );
-	if ( T != None )
-	{
-		MonsterReplicationInfo(GameReplicationInfo).HuntersIcon = T;
-		if ( int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 11 )
-		{
-			S = Left(HunterTeamIcon, InStr(HunterTeamIcon,"."));
-			AddToPackageMap( S);
-		}
-	}
-
-	//Validate UI replacements of
+	//Validate UI replacements of MonsterBase
 	For ( M=BaseMutator ; M!=None ; M=M.NextMutator )
 		if ( M.IsA('MonsterBase') )
 		{
@@ -80,6 +66,26 @@ event InitGame(string Options, out string Error)
 
 	bCountMonstersAgain = true;
 }
+
+function InitGameReplicationInfo()
+{
+	local Texture T;
+	
+	Super.InitGameReplicationInfo();
+
+	if ( MonsterReplicationInfo(GameReplicationInfo) == None )
+		return;
+
+	//Initialize hunter icon, make sure it is relevant
+	T = Texture( DynamicLoadObject(HunterTeamIcon,class'Texture') );
+	if ( T != None )
+	{
+		MonsterReplicationInfo(GameReplicationInfo).HuntersIcon = T;
+		if ( (Level.NetMode != NM_Standalone) && (int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 11) )
+			AddToPackageMap( Left(HunterTeamIcon, InStr(HunterTeamIcon,".")) );
+	}
+}
+
 
 event PostLogin( PlayerPawn NewPlayer )
 {
@@ -123,6 +129,67 @@ function CheckEndGame()
 	if ( KnockedOut > 0 )
 		EndGame("No hunters");
 }
+
+function bool SetEndCams(string Reason)
+{
+	local MonsterEnd E;
+	local bool bWon;
+	local TeamInfo BestTeam;
+	local int i;
+	local pawn P, Best;
+	local PlayerPawn player;
+
+	// find prick that touched the MonsterEnd actor
+	For ( E=EndList ; E!=None ; E=E.NextEnd )
+		if ( E.TriggerTime == Level.TimeSeconds ) //This one caused the event
+		{
+			ForEach E.TouchingActors( class'Pawn', P)
+				if ( P.bIsPlayer && (P.PlayerReplicationInfo != None) && (P.PlayerReplicationInfo.Team == 0) )
+				{
+					Best = P;
+					break;
+				}
+			break;
+		}
+	
+	// find individual winner
+	if ( Best == None )
+	{
+		for ( P=Level.PawnList; P!=None; P=P.nextPawn )
+			if ( P.bIsPlayer && P.PlayerReplicationInfo != None && ((Best == None) || (P.PlayerReplicationInfo.Score > Best.PlayerReplicationInfo.Score)) )
+				Best = P;
+	}
+	
+	if ( Reason ~= "No hunters" )
+		GameReplicationInfo.GameEndedComments = "Hunting party eliminated!";
+	else if ( Reason ~= "Timelimit" )
+		GameReplicationInfo.GameEndedComments = TimeOutMessage;
+	else
+	{
+		bWon = true;
+		GameReplicationInfo.GameEndedComments = GameEndedMessage;
+	}
+
+	EndTime = Level.TimeSeconds + 3.0;
+	for ( P=Level.PawnList; P!=None; P=P.nextPawn )
+	{
+		player = PlayerPawn(P);
+		if ( Player != None )
+		{
+			PlayWinMessage(Player, bWon);
+			player.bBehindView = true;
+			if ( Player == Best )
+				Player.ViewTarget = None;
+			else
+				Player.ViewTarget = Best;
+			player.ClientGameEnded();
+		}
+		P.GotoState('GameEnded');
+	}
+	CalcEndStats();
+	return true;
+}
+
 
 function bool RestartPlayer( Pawn aPlayer)
 {
@@ -178,7 +245,9 @@ function bool ChangeTeam(Pawn Other, int NewTeam)
 
 function Killed (Pawn Killer, Pawn Other, name DamageType)
 {
-	Super.Killed(Killer,Other,DamageType);
+	Super.Killed( Killer, Other, DamageType);
+	if ( (ScriptedPawn(Killer) != None) && (Other.PlayerReplicationInfo != None) ) //Weird bug... fix?
+		Other.PlayerReplicationInfo.Deaths += 1;
 	if ( (Lives > 0) && Other.bIsPlayer && (Other.PlayerReplicationInfo != None) && (Other.PlayerReplicationInfo.Deaths >= Lives) )
 		bCheckEndLivesAgain = true;
 }
@@ -190,6 +259,7 @@ function ScoreKill( Pawn Killer, Pawn Other)
 	local ScriptedPawn S;
 	local MonsterPlayerData MPD;
 	local MonsterReplicationInfo MRI;
+	local float ScoreStart;
 
 	bCountMonstersAgain = true;
 	S = ScriptedPawn(Other);
@@ -201,6 +271,13 @@ function ScoreKill( Pawn Killer, Pawn Other)
 	}
 	if ( (Killer != None) && Killer.bIsPlayer && (Killer.PlayerReplicationInfo != None) && (S != None) )
 	{
+		if ( S.bIsPlayer )
+			S.bIsPlayer = false; //Prevent skaarj log bug on non-XCGE servers (?)
+
+		//Record initial score
+		ScoreStart = Killer.PlayerReplicationInfo.Score;
+		Super(GameInfo).ScoreKill( Killer, Other);
+
 		BroadcastMessage( Killer.GetHumanName() @ "killed" $ Other.GetHumanName());
 		For ( i=0 ; i<10 && (MonsterKillType[i] != '') ; i++ )
 			if ( Other.IsA(MonsterKillType[i]) )
@@ -213,22 +290,28 @@ function ScoreKill( Pawn Killer, Pawn Other)
 			Killer.PlayerReplicationInfo.Score += Sqrt( float(Other.default.Health) * 0.01 );
 
 		if ( MRI != None ) MPD = MRI.GetPlayerData( Killer.PlayerReplicationInfo.PlayerID);
+		if ( MRI != None ) MRI.KilledMonsters++;
 		if ( MPD != None ) MPD.MonsterKills++;
 		if ( S.bIsBoss )
 		{
 			Killer.PlayerReplicationInfo.Score += 9;
 			if ( MPD != None ) MPD.BossKills++;
 		}
+		//Add score difference to team
+		Teams[0].Score += Killer.PlayerReplicationInfo.Score - ScoreStart;
 	}
 	else
 	{
-		Super.ScoreKill(Killer,Other);
-		if ( (Other.PlayerReplicationInfo != None) && (Lives > 0) )
+		Super(GameInfo).ScoreKill( Killer, Other);
+		if ( Other.PlayerReplicationInfo != None )
 		{
-			if ( Killer == Other )
-				Killer.PlayerReplicationInfo.Score -= 4;
-			else if ( Killer.IsA('ScriptedPawn') )
-				Killer.PlayerReplicationInfo.Score -= 5;
+			if ( Lives <= 0 )
+			{
+				if ( Killer == Other )
+					Killer.PlayerReplicationInfo.Score -= 4;
+				else if ( ScriptedPawn(Killer) != None )
+					Killer.PlayerReplicationInfo.Score -= 5;
+			}
 		}
 	}
 }
@@ -775,10 +858,12 @@ defaultproperties
 	Lives=6
 	bUseTeamSkins=True
 	bReplaceUIWeapons=True
+	DamageToScore=400
 	TimeLimit=30
 	MutatorClass=Class'MonsterBase'
 	DefaultWeapon=Class'Botpack.ChainSaw'
 	MapListType=Class'MonsterMapList'
+	RulesMenuType="MonsterHunt.MonsterHuntRules"
 	ScoreBoardType=Class'MonsterBoard'
 	HUDType=Class'MonsterHUD'
 	GameReplicationInfoClass=Class'MonsterReplicationInfo'
