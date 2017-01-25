@@ -25,6 +25,7 @@ var string TimeOutMessage;
 var MonsterWaypoint WaypointList;
 var MonsterEnd EndList;
 var MonsterAuthenticator AuthenticatorList;
+var MonsterBriefing Briefing;
 var ScriptedPawn ReachableEnemy;
 
 //********************
@@ -64,6 +65,8 @@ event InitGame(string Options, out string Error)
 			break;
 		}
 
+	Briefing = Spawn( Class'MonsterBriefing');
+		
 	bCountMonstersAgain = true;
 }
 

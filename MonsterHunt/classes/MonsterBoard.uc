@@ -19,6 +19,7 @@ var transient float LastSortTime;
 
 var bool bAllowDraw;
 var MonsterReplicationInfo MRI;
+var MonsterBriefing Briefing;
 var Font PtsFont26,PtsFont24,PtsFont22, PtsFont20, PtsFont18, PtsFont16, PtsFont14, PtsFont12;
 var FontInfo MyFonts;
 var TeamInfo HunterTeam;
@@ -66,8 +67,14 @@ event Timer()
 			HunterTeam = T;
 			break;
 		}
+
+	if ( Briefing == None )
+	{
+		ForEach AllActors (class'MonsterBriefing',Briefing)
+			break;
+	}
 	
-	if ( (HunterTeam != None && MRI != None) || (Level.TimeSeconds > 3 * Level.TimeDilation) )
+	if ( (HunterTeam != None && MRI != None && Briefing != None) || (Level.TimeSeconds > 3 * Level.TimeDilation) )
 		bAllowDraw = true;
 	else
 		SetTimer( 0.2 * Level.TimeDilation, false);
@@ -92,10 +99,11 @@ final function string AlignToRight( int Align)
 function ShowScores(Canvas Canvas)
 {
 	local int i, Time, TeamX, TeamY;
-	local float X,Y, xLen,yLen, pnx,pny, paddingInfo, ruX, avgY;
+	local float X,Y, xLen, yLen, pnx, pny, paddingInfo, ruX, avgY;
 	local string s;
 	local PlayerReplicationInfo aPRI;
 	local MonsterPlayerData aMPD;
+	local MHI_Base MHI;
 	local int Cycles;
 
 	if ( !bAllowDraw )
@@ -343,10 +351,94 @@ function ShowScores(Canvas Canvas)
 		Canvas.SetPos( X+5,Y+5);
 		Canvas.DrawText(NotShownPlayers@"Player not shown!", false);
 	}
+
+
+	// BRIEFING!!!
+
+	//Setup (Y is kept from before)
+	if ( Briefing != None )
+	{
+		X = getXHeader( 2, Canvas.ClipX);
+		TeamX = X;
+		Y = TeamY;
+				
+		////////
+		//Header
+		////////
+		Canvas.bNoSmooth = False;
+		Canvas.DrawColor = White;
+		//Canvas.Style = ERenderStyle.STY_Translucent;
+		Canvas.Style = ERenderStyle.STY_Modulated;
+		Canvas.SetPos( X, Y );
+
+		avgY = Canvas.ClipY - (tableLine1*1.7 + 80); //How much our box can grow
+		i = 0; //Amount of stuff I can draw
+
+		//Calculate size of black box
+		ruX = tableHeaderHeight;
+		For ( MHI=Briefing.InterfaceEventList ; MHI!=None ; MHI=MHI.NextEvent )
+		{
+			i++;
+			ruX += MHI.DrawY;
+			if ( MHI.DrawY <= 0 || ruX >= avgY )
+				break;
+		}
+		Canvas.DrawRect( texture'shade2', tableWidth , ruX );
+
+		//Draw header
+		Canvas.Style = ERenderStyle.STY_Normal;
+		Canvas.SetPos( X+5, Y+5 );
+		Canvas.DrawColor = White;
+		Canvas.DrawIcon( Texture'S_Alarm', 1);
+
+		Canvas.Font = PtsFont26;
+		Canvas.SetPos( X+50, Y + 10);
+		Canvas.DrawColor = BrightCyan;
+		Canvas.DrawText( "Event History");
+		
+		//Get base canvas Clip and set new origin
+		pnX = Canvas.ClipX;
+		pnY = Canvas.ClipY;
+		Canvas.SetClip( tableWidth-(4+50), avgY - (tableHeaderHeight+4) ); //50 extra pixels for 00:00 timer
+		Canvas.SetOrigin( X+2, Y+tableHeaderHeight+2);
+
+		MHI=Briefing.InterfaceEventList;
+		ruX = 0;
+		while ( (i>0) && (MHI!=None) )
+		{
+			//Draw Timestamp here
+			Canvas.Font = PtsFont12;
+			s = TwoDigitString( MHI.TimeStamp/60 ) $ ":" $ TwoDigitString( MHI.TimeStamp%60 );
+			Canvas.DrawColor = BrightGold;
+			Canvas.SetPos( 0, ruX+1);
+			Canvas.DrawText( s);
+			
+			Canvas.OrgX += 50;
+
+			//Draw event here
+			Canvas.Font = Font'UnrealShare.WhiteFont'; //Default font
+			Time = MHI.DrawEvent( Canvas, ruX);
+			MHI.DrawY = Time; //Update Y coords
+			ruX += Time;
+			
+			Canvas.OrgX -= 50;
+			i--;
+			MHI=MHI.NextEvent;
+		}
+		
+		
+		
+		Canvas.SetOrigin( 0, 0);
+		Canvas.SetClip( pnX, pnY);
+	}
+
+
 	DrawFooters(Canvas);
+
+
 	
 	Cycles = GetCycles() - Cycles;
-	if ( Cycles > 0 )
+	if ( Cycles != 0 )
 	{
 		Canvas.SetPos( 5, 100);
 		Canvas.DrawText( "Render cycles: "$Cycles);
@@ -481,6 +573,12 @@ function SortPRI()
 	{
 		For ( i=0 ; i<iPRI ; i++ )
 			MPD[i] = MRI.GetPlayerData( PRI[i].PlayerID);
+	}
+	
+	if ( Briefing == None )
+	{
+		ForEach AllActors (class'MonsterBriefing',Briefing)
+			break;
 	}
 }
 

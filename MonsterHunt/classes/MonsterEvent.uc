@@ -8,13 +8,24 @@ class MonsterEvent expands Triggers;
 var() localized string Message;
 var() bool bBroadcastOnceOnly;
 var bool bDisabled;
+var bool bAlreadyTriggered;
 
 function Trigger( Actor Other, Pawn EventInstigator)
 {
+	local MHI_CriticalEvent NewEvent;
+	
 	if ( bDisabled )
 		return;
-	bDisabled = bBroadcastOnceOnly;
 	BroadcastMessage( Message, True, 'MonsterCriticalEvent');
+	bDisabled = bBroadcastOnceOnly;
+	
+	if ( !bAlreadyTriggered && (MonsterHunt(Level.Game) != None) && (MonsterHunt(Level.Game).Briefing != None) )
+	{
+		NewEvent = Level.Game.Spawn(class'MHI_CriticalEvent');
+		NewEvent.bMHCrit = true;
+		NewEvent.CriticalMessage = Message;
+	}
+	bAlreadyTriggered = true;
 }
 
 defaultproperties
