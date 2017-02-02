@@ -49,9 +49,23 @@ simulated event Destroyed()
 		Briefing.RemoveIEvent( self);
 }
 
+simulated final function bool IsTopInterface()
+{
+	return Briefing != None && Briefing.InterfaceEventList == self;
+}
+
+simulated final function MoveToTop()
+{
+	if ( Briefing != None )
+	{
+		Briefing.RemoveIEvent( self);
+		EventIndex = Briefing.CurrentIndex++;
+		Briefing.InsertIEvent(self);
+	}
+}
 
 //Canvas clips and base positions must be preset!
-simulated function int DrawEvent( Canvas Canvas, float YStart);
+simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB);
 
 
 

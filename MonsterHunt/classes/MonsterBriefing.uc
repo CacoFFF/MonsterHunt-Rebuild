@@ -26,6 +26,7 @@ simulated event PostBeginPlay()
 		InitialState = 'Server';
 }
 
+
 state Server
 {
 	event BeginState()
@@ -67,9 +68,19 @@ state Server
 			if ( SE.bBroadcast && SE.Message != "" )
 				Spawn( class'MHE_CriticalEvent').RegisterEvent( SE);
 	}
+	
+	function GenerateSpawners()
+	{
+		local ThingFactory TF;
+		ForEach AllActors (class'ThingFactory', TF)
+			if ( TF.Prototype != None && ClassIsChildOf(TF.Prototype, Class'ScriptedPawn') && TF.Capacity > 1 )
+				Spawn( class'MHE_MonsterSpawner').RegisterFactory( TF);
+	}
 Begin:
 	Sleep( 0.1);
 	GenerateCriticalEvents();
+	Sleep( 0.1);
+	GenerateSpawners();
 }
 
 

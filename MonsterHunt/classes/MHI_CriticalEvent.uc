@@ -9,7 +9,7 @@ replication
 		CriticalMessage, bMHCrit;
 }
 
-simulated function int DrawEvent( Canvas Canvas, float YStart)
+simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB)
 {
 	if ( bMHCrit )
 		Canvas.DrawColor = Cyan;

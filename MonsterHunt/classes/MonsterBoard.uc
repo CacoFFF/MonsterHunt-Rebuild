@@ -408,16 +408,15 @@ function ShowScores(Canvas Canvas)
 		{
 			//Draw Timestamp here
 			Canvas.Font = PtsFont12;
-			s = TwoDigitString( MHI.TimeStamp/60 ) $ ":" $ TwoDigitString( MHI.TimeStamp%60 );
 			Canvas.DrawColor = BrightGold;
 			Canvas.SetPos( 0, ruX+1);
-			Canvas.DrawText( s);
+			Canvas.DrawText( TimeToClock(MHI.TimeStamp) );
 			
 			Canvas.OrgX += 50;
 
 			//Draw event here
 			Canvas.Font = Font'UnrealShare.WhiteFont'; //Default font
-			Time = MHI.DrawEvent( Canvas, ruX);
+			Time = MHI.DrawEvent( Canvas, ruX, self);
 			MHI.DrawY = Time; //Update Y coords
 			ruX += Time;
 			
@@ -521,6 +520,7 @@ function SortPRI()
 {
 	local int i,j,k, maxIndex, sorted;
 	local PlayerReplicationInfo aPRI;
+	local MHI_Base MHI, MHI_Next;
 
 	AvgPing = 0;
 	AvgPL = 0;
@@ -580,6 +580,20 @@ function SortPRI()
 		ForEach AllActors (class'MonsterBriefing',Briefing)
 			break;
 	}
+	else
+	{
+		For ( MHI=Briefing.InterfaceEventList ; MHI!=None ; MHI=MHI_Next )
+		{
+			MHI_Next = MHI.NextEvent;
+			if ( MHI.EventIndex != MHI.OldIndex )
+			{
+				Briefing.RemoveIEvent( MHI);
+				MHI.OldIndex = MHI.EventIndex;
+				MHI.NextEvent = None;
+				Briefing.InsertIEvent( MHI);
+			}
+		}
+	}
 }
 
 function string GetTimeStr()
@@ -599,6 +613,11 @@ function string GetTimeStr()
 		@	MonthString[ Clamp(PlayerPawn( Owner ).Level.month,0,12) ]
 		@	PlayerPawn( Owner ).Level.Year
 		$	"," @ Hour $ ":" $Min;
+}
+
+function string TimeToClock( int iTime)
+{
+	return TwoDigitString( iTime/60 ) $ ":" $ TwoDigitString( iTime%60 );
 }
 
 function float getXHeader( int CurTeam, int screenWidth)
