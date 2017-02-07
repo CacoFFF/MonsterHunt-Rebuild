@@ -233,6 +233,17 @@ function bool IsRelevant( Actor Other)
 	return Result;
 }
 
+// Fix monster dropped weapons/items breaking the client's inventory chain
+function bool PickupQuery( Pawn Other, Inventory item )
+{
+	local bool bResult;
+	
+	bResult = Super.PickupQuery( Other, Item);
+	if ( bResult && Item.bAlwaysRelevant )
+		Item.bAlwaysRelevant = false;
+	return bResult;
+}
+
 function bool ChangeTeam(Pawn Other, int NewTeam)
 {
 	local bool Result;

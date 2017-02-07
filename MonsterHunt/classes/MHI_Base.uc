@@ -89,8 +89,8 @@ Begin:
 	NetPriority = default.NetPriority;
 	if ( bDormant )
 	{
-		NetUpdatePriority *= 0.7;
 		NetUpdateFrequency *= 0.7;
+		NetPriority *= 0.7;
 	}
 	GotoState('');
 }
