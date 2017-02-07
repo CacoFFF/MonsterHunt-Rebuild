@@ -23,6 +23,7 @@ var Texture CachedBelt;
 var float DecimalTimer;
 var float AddedYSynopsis;
 var int PickupCounter;
+var localized string IdentifyArmor;
 
 
 var color ProtectionColors[3];
@@ -41,7 +42,7 @@ simulated function Tick( float DeltaTime)
 
 simulated function TimerDecimal()
 {
-	if ( Level.NetMode == NM_Client )
+	if ( Level.NetMode == NM_Client && (PlayerOwner != None) )
 	{
 		if ( (CachedDamp != None) && CachedDamp.bActive && (CachedDamp.Charge > 0) )
 		{
@@ -131,6 +132,31 @@ function DrawGameSynopsis( Canvas Canvas)
 		Canvas.SetPos(0.0, YOffset += YL);
 		Canvas.DrawText(" Bosses: " $ string(MRI.KilledBosses) @"/"@ string( MRI.KilledBosses+MRI.BossCount), false);
     }
+}
+
+simulated function bool DrawIdentifyInfo(canvas Canvas)
+{
+	local float XL, YL, XOffset, X1;
+	local Pawn P;
+	local MonsterPlayerData MPD;
+	local MonsterReplicationInfo MRI;
+
+
+	if ( !TraceIdentify(Canvas) || (IdentifyTarget.PlayerName == "") )
+		return false;
+		
+	Canvas.Font = MyFonts.GetBigFont(Canvas.ClipX);
+	DrawTwoColorID(Canvas,IdentifyName, IdentifyTarget.PlayerName, Canvas.ClipY - 256 * Scale);
+	P = Pawn(IdentifyTarget.Owner);
+	if ( P != None )
+	{
+		Canvas.StrLen("TEST", XL, YL);
+		DrawTwoColorID(Canvas,IdentifyHealth,string(P.Health), (Canvas.ClipY - 256 * Scale) + 1.5 * YL);
+		MRI = MonsterReplicationInfo(PlayerOwner.GameReplicationInfo);
+		if ( MRI != None )	MPD = MRI.GetPlayerData( IdentifyTarget.PlayerID);
+		if ( MPD != None )	DrawTwoColorID(Canvas,IdentifyArmor,string(MPD.Armor), (Canvas.ClipY - 256 * Scale) + 2.5 * YL);
+	}
+	return true;
 }
 
 simulated final function int GetProtIdx( name ProtType)
@@ -638,5 +664,8 @@ defaultproperties
 	ProtectionColors(0)=(G=250)
 	ProtectionColors(1)=(G=100,B=220)
 	ProtectionColors(2)=(R=250,G=70)
+	IdentifyArmor="Armor:"
+	AltTeamColor(0)=(R=90,G=180,B=180)
+	TeamColor(0)=(R=127,G=255,B=255)
 }
 

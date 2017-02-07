@@ -10,6 +10,8 @@ var NavigationPoint DeferTo;
 var bool bDiscovered;
 var bool bCompleted;
 
+native(3553) final iterator function DynamicActors( class<actor> BaseClass, out actor Actor, optional name MatchTag );
+
 function Discover()
 {
 	bDiscovered = true;

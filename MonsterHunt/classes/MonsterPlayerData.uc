@@ -17,8 +17,8 @@ var int BossKills;
 var int ObjectivesTaken;
 var int Health;
 var int Armor;
-var int ActiveTime;
 var int AccDamage;
+var int ActiveMinutes;
 
 //Recovery-related stats
 var float SavedScore;
@@ -31,6 +31,7 @@ var bool bAuthenticated;
 var byte TeamSkin;
 var float SecondTimer;
 var int OldPlayerID;
+var int ActiveSeconds;
 
 //IpToCountry
 var Actor Ip2C_Actor;
@@ -42,7 +43,7 @@ var bool bFlagCached;
 replication
 {
 	reliable if ( Role==ROLE_Authority )
-		PlayerID, Health, Armor, MonsterKills, BossKills, Ip2C_Prefix, ActiveTime;
+		PlayerID, Health, Armor, MonsterKills, BossKills, ObjectivesTaken, Ip2C_Prefix, ActiveMinutes;
 }
 
 
@@ -138,7 +139,7 @@ function TimerSecond()
 {
 	if ( bAuthenticated )
 	{
-		ActiveTime++;
+		ActiveMinutes = (++ActiveSeconds) / 60;
 		if ( (Ip2C_CountDown > 0) && (--Ip2C_CountDown == 0) )
 			ResolveCountry();
 	}

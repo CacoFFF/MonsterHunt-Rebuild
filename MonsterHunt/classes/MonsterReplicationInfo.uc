@@ -11,6 +11,7 @@ var int Hunters;
 var int BossCount, KilledBosses; //Boss counter
 var PlayerPawn LocalPlayer;
 var Texture HuntersIcon;
+var localized int LocaleVersion;
 
 var MonsterPlayerData DataHash[32];
 var MonsterPlayerData InactiveDatas;

@@ -33,7 +33,7 @@ function Touch( Actor Other)
 			ForEach AllActors (class'Actor', A, Event)
 				A.Trigger( self, Pawn(Other));
 		if ( MonsterHunt(Level.Game) != None )
-			MonsterHunt(Level.Game).WaypointVisited( self);
+			MonsterHunt(Level.Game).WaypointVisited( self, Pawn(Other).PlayerReplicationInfo );
  	}
 }
 

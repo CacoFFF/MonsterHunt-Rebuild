@@ -2,11 +2,9 @@ class MHI_Base expands Info;
 
 var MonsterBriefing Briefing;
 var MHI_Base NextEvent;
+var int TargetNUF;
 
 var int DrawY;
-var Color Cyan;
-var Color White;
-var Color Grey;
 
 var int TimeStamp;
 var int EventIndex;
@@ -22,6 +20,7 @@ replication
 
 event PostBeginPlay()
 {
+	TargetNUF = NetUpdateFrequency;
 	if ( default.bNetTemporary )
 		bDormant = true;
 	if ( (MonsterHunt(Level.Game) != None) && (MonsterHunt(Level.Game).Briefing != None) )
@@ -69,11 +68,36 @@ simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB);
 
 
 
+//*************************************************
+//**************** NetUpdateFrequency regulators
+
+function BoostNet()
+{
+	GotoState('BoostNUF');
+}
+
+auto state BoostNUF
+{
+	function BoostNet()
+	{
+	}
+Begin:
+	NetUpdateFrequency = 10;
+	NetPriority = default.NetPriority*2;
+	Sleep(0.5);
+	NetUpdateFrequency = TargetNUF;
+	NetPriority = default.NetPriority;
+	if ( bDormant )
+	{
+		NetUpdatePriority *= 0.7;
+		NetUpdateFrequency *= 0.7;
+	}
+	GotoState('');
+}
+
+
 defaultproperties
 {
 	bAlwaysRelevant=True
-	NetUpdateFrequency=3
-	White=(R=255,G=255,B=255)
-	Grey=(R=200,G=200,B=200)
-	Cyan=(R=128,G=255,B=255)
+	NetUpdateFrequency=2
 }

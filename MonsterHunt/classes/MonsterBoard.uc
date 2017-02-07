@@ -24,7 +24,7 @@ var Font PtsFont26,PtsFont24,PtsFont22, PtsFont20, PtsFont18, PtsFont16, PtsFont
 var FontInfo MyFonts;
 var TeamInfo HunterTeam;
 
-var Color BrightRed, BrightBlue, BrightGold, White, BrightCyan;
+var Color BrightRed, BrightBlue, BrightGold, White, BrightCyan, Orange, Grey;
 var() localized string MonthString[13];
 var() localized string DayString[7];
 
@@ -306,7 +306,7 @@ function ShowScores(Canvas Canvas)
 			Canvas.SetPos(X+xLen+paddingInfo+40, Y + yLen + 9);
 			Canvas.DrawText("AP: "@AlignToRight(aMPD.Armor), false);
 
-			Time = (30+aMPD.ActiveTime) / 60;
+			Time = aMPD.ActiveMinutes;
 		}
 		else
 			Time = Max(1, (Level.TimeSeconds + PlayerPawn(Owner).PlayerReplicationInfo.StartTime - aPRI.StartTime)/60);
@@ -657,6 +657,8 @@ defaultproperties
 	BrightRed=(R=255,G=50,B=50)
 	BrightBlue=(R=80,B=255,G=120)
 	BrightGold=(R=255,G=255,B=20)
+	Orange=(R=255,G=127,B=0)
+	Grey=(R=200,G=200,B=200)
 	DayString(0)="Sunday"
 	DayString(1)="Monday"
 	DayString(2)="Tuesday"

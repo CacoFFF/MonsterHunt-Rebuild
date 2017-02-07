@@ -2,24 +2,30 @@ class MHE_MonsterSpawner expands MHE_Base;
 
 var ThingFactory MarkedFactory;
 var int OriginalIndex;
+var int CountedPawns;
+var name ItemTag;
 var bool bWasSpawning;
 
 function RegisterFactory( ThingFactory Other)
 {
 	MarkedFactory = Other;
-	SetTimer( 1 + FRand() * 0.2, true);
+	Tag = Other.Tag;
+	ItemTag = Other.ItemTag;
+	SetTimer( 1.5 + FRand(), true);
+}
+
+event Trigger( Actor Other, Pawn EventInstigator)
+{
+	//A monster has died
+	if ( (Other.Tag == ItemTag) && (ScriptedPawn(Other) != None) && (ScriptedPawn(Other).Health <= 0) )
+		CheckState();
 }
 
 function CheckState()
 {
-	UpdateInterface();
-	if ( MarkedFactory == None || MarkedFactory.bDeleteMe || MarkedFactory.IsInState('Finished') )
-	{
+	if ( MarkedFactory == None || MarkedFactory.bDeleteMe || MarkedFactory.IsInState('Finished') || (MarkedFactory.Capacity == 0) )
 		bCompleted = true;
-		return;
-	}
-
-	if ( MarkedFactory.IsInState('Waiting') )
+	else if ( MarkedFactory.IsInState('Waiting') )
 	{
 	}
 	else if ( MarkedFactory.IsInState('Spawning') )
@@ -28,6 +34,7 @@ function CheckState()
 			Discover();
 		bWasSpawning = True;
 	}
+	UpdateInterface();
 }
 
 function Discover()
@@ -43,7 +50,6 @@ function Discover()
 		MHI.MonsterName = Class<Pawn>(MarkedFactory.Prototype).default.MenuName;
 		if ( MHI.MonsterName == "" )
 			MHI.MonsterName = string(MarkedFactory.Prototype.Name);
-		UpdateInterface();
 	}
 }
 
@@ -51,16 +57,24 @@ function UpdateInterface()
 {
 	local MHI_MonsterSpawner MHI;
 
+	if ( MarkedFactory != None && !bCompleted )
+		CountedPawns = MarkedFactory.Capacity + MarkedFactory.NumItems;
+	else
+		CountedPawns = CountPawns();
+	
 	MHI = MHI_MonsterSpawner(Interface);
 	if ( MHI != None )
 	{
-		if ( MHI.MonstersLeft != MarkedFactory.Capacity )
+		if ( MHI.MonstersLeft != CountedPawns )
 		{
-			MHI.MonstersLeft = MarkedFactory.Capacity;
+			MHI.MonstersLeft = CountedPawns;
+			MHI.BoostNet();
+			MHI.bSpawnFinished = bCompleted;
 			if ( !MHI.IsTopInterface() )
 				MHI.MoveToTop();
 		}
-		if ( (MHI.CompletedAt == 0) && (MarkedFactory.Capacity == 0) )
+		
+		if ( (MHI.CompletedAt == 0) && (CountedPawns == 0) )
 		{
 			MHI.CompletedAt = MHI.Briefing.CurrentTime;
 			MHI.bDormant = true;
@@ -70,6 +84,7 @@ function UpdateInterface()
 				MHI.EventIndex = OriginalIndex;
 				MHI.Briefing.InsertIEvent( MHI);
 			}
+			Destroy();
 		}
 	}
 }
@@ -77,4 +92,26 @@ function UpdateInterface()
 event Timer()
 {
 	CheckState();
+}
+
+function int CountPawns()
+{
+	local ScriptedPawn S;
+	local int i;
+	
+	ForEach AllActors ( class'ScriptedPawn', S, ItemTag)
+		if ( S.Event == Tag )
+			i++;
+	return i;
+}
+
+function int CountPawns_XC()
+{
+	local ScriptedPawn S;
+	local int i;
+	
+	ForEach DynamicActors ( class'ScriptedPawn', S, ItemTag)
+		if ( S.Event == Tag )
+			i++;
+	return i;
 }

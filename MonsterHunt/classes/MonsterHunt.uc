@@ -53,6 +53,7 @@ event InitGame(string Options, out string Error)
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountHunters', 'CountHunters_XC');
 		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'FindIpToCountry', 'FindIpToCountry_XC');
 		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'BroadcastMessage', 'BroadcastMessage_XC');
+		ReplaceFunction( class'MHE_MonsterSpawner', class'MHE_MonsterSpawner', 'CountPawns', 'CountPawns_XC');
 	}
 	
 	Super.InitGame( Options, Error);
@@ -742,8 +743,13 @@ function RegisterWaypoint( MonsterWaypoint Other)
 }
 
 //Waypoint has been visited
-function WaypointVisited( MonsterWaypoint Other)
+function WaypointVisited( MonsterWaypoint Other, PlayerReplicationInfo Visitor)
 {
+	local MonsterPlayerData MPD;
+	
+	MPD = MonsterReplicationInfo(GameReplicationInfo).GetPlayerData( Visitor.PlayerID);
+	if ( MPD != None )
+		MPD.ObjectivesTaken++;
 	UnregisterWaypoint( Other);
 }
 

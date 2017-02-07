@@ -12,9 +12,9 @@ replication
 simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB)
 {
 	if ( bMHCrit )
-		Canvas.DrawColor = Cyan;
+		Canvas.DrawColor = MB.BrightCyan;
 	else
-		Canvas.DrawColor = Grey;
+		Canvas.DrawColor = MB.Grey;
 	Canvas.SetPos( 0, YStart+3);
 	Canvas.DrawText( CriticalMessage, false);
 	return (Canvas.CurY-YStart) + 6;

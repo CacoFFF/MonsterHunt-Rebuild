@@ -3,6 +3,7 @@ class MHE_Trigger expands MHE_Base;
 
 var Trigger MarkedTrigger;
 var MHE_Base ToggledDoor; //Fix later
+var bool bIsSlave; //Do not create interface
 var bool bNotifyTriggerEnable;
 var bool bNotifyTriggerHit;
 
