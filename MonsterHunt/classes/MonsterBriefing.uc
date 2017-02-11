@@ -77,9 +77,9 @@ state Server
 				Spawn( class'MHE_MonsterSpawner').RegisterFactory( TF);
 	}
 Begin:
-	Sleep( 0.1);
+	Sleep( 0.01);
 	GenerateCriticalEvents();
-	Sleep( 0.1);
+	Sleep( 0.01);
 	GenerateSpawners();
 }
 

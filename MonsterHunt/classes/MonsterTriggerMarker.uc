@@ -6,10 +6,14 @@
 class MonsterTriggerMarker extends NavigationPoint;
 
 var Triggers MarkedTrigger;
+var MonsterTriggerMarker NextTriggerMarker;
 
 event PostBeginPlay()
 {
 	local Triggers T, PrevT;
+	local NavigationPoint N;
+	
+	SetCollisionSize( 38, 17);
 	
 	ForEach RadiusActors ( class'Triggers', T, 200)
 		if ( IsTouching(T) )
@@ -33,6 +37,18 @@ event PostBeginPlay()
 			ExtraCost = 10000000;
 		else if ( MarkedTrigger.IsA('Kicker') ) //Makes bots go around this path if not attempting to go through the kicker
 			ExtraCost = 400;
+	}
+	
+	if ( MonsterHunt(Level.Game) != None )
+		NextTriggerMarker = MonsterHunt(Level.Game).TriggerMarkers;
+	else
+	{
+		For ( N=NextNavigationPoint ; N!=None ; N=N.NextNavigationPoint )
+			if ( N.IsA('MonsterTriggerMarker') )
+			{
+				NextTriggerMarker = MonsterTriggerMarker(N);
+				break;
+			}
 	}
 }
 

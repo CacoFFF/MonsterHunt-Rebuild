@@ -10,12 +10,41 @@ var NavigationPoint DeferTo;
 var bool bDiscovered;
 var bool bCompleted;
 
+var enum EDeferToMode
+{
+	DTM_Nearest,
+	DTM_InCollision,
+	DTM_NearestVisible,
+	DTM_None
+} DeferToMode;
+
 native(3553) final iterator function DynamicActors( class<actor> BaseClass, out actor Actor, optional name MatchTag );
 
 function Discover()
 {
 	bDiscovered = true;
 }
+
+function PostInit();
+
+function FindDeferPoint()
+{
+	local MonsterTriggerMarker MTM;
+
+	if ( DeferToMode == DTM_None )
+		return;
+	if ( DeferToMode == DTM_InCollision )
+	{
+		For ( MTM=MonsterHunt(Level.Game).TriggerMarkers ; MTM!=None ; MTM=MTM.NextTriggerMarker )
+			if ( MTM.IsTouching( self) )
+			{
+				DeferTo = MTM;
+				return;
+			}
+	}
+}
+
+
 
 event PostBeginPlay()
 {
@@ -26,12 +55,14 @@ event PostBeginPlay()
 	}
 }
 
-
 event Destroyed()
 {
 	if ( MonsterHunt(Level.Game).Briefing != None )
 		MonsterHunt(Level.Game).Briefing.RemoveEvent( self);
 }
+
+
+
 
 defaultproperties
 {

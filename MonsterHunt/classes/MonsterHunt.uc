@@ -15,6 +15,7 @@ var() config string HunterTeamIcon;
 var bool bCountMonstersAgain; //Monster counting isn't immediate, helps other mutators properly affect monsters before we do it
 var bool bCheckEndLivesAgain;
 var bool bSkipThisMonster; //Mutator doesn't want this monster to be difficulty-scaled
+var bool bQueryEnemies;
 
 //User-define kill scores
 var() config name MonsterKillType[10];
@@ -26,6 +27,7 @@ var MonsterWaypoint WaypointList;
 var MonsterEnd EndList;
 var MonsterAuthenticator AuthenticatorList;
 var MonsterBriefing Briefing;
+var MonsterTriggerMarker TriggerMarkers;
 var ScriptedPawn ReachableEnemy;
 
 //********************
@@ -103,6 +105,27 @@ event PostLogin( PlayerPawn NewPlayer )
 	}
 }
 
+
+function Timer()
+{
+	local Pawn P;
+	local float DivChance;
+	
+	Super.Timer();
+	
+	//Can be used to override ReachableEnemy even if it's set
+	if ( bQueryEnemies )
+	{
+		For ( P=Level.PawnList ; P!=None ; P=P.NextPawn )
+			if ( (P.PlayerReplicationInfo == None) && P.IsA('ScriptedPawn') && P.bCollideActors && (P.AttitudeToPlayer < ATTITUDE_Friendly) )
+			{
+				DivChance += 1;
+				if ( FRand() < 1/DivChance )
+					ReachableEnemy = ScriptedPawn(P);
+			}
+		bQueryEnemies = false;
+	}
+}
 
 //Recont everything right after match starts
 function StartMatch()
@@ -262,7 +285,11 @@ function Killed (Pawn Killer, Pawn Other, name DamageType)
 {
 	Super.Killed( Killer, Other, DamageType);
 	if ( (ScriptedPawn(Killer) != None) && (Other.PlayerReplicationInfo != None) ) //Weird bug... fix?
+	{
 		Other.PlayerReplicationInfo.Deaths += 1;
+		if ( ReachableEnemy == None || ReachableEnemy.bDeleteMe || ScriptedPawn(Killer).bIsBoss )
+			ReachableEnemy = ScriptedPawn(Killer);
+	}
 	if ( (Lives > 0) && Other.bIsPlayer && (Other.PlayerReplicationInfo != None) && (Other.PlayerReplicationInfo.Deaths >= Lives) )
 		bCheckEndLivesAgain = true;
 }
@@ -479,8 +506,8 @@ function bool AttractTo( Pawn Other, Actor Dest, optional bool bNoSearch)
 	
 	if ( !bNoSearch )
 	{
-		BestDist = 500;
-		ForEach Dest.RadiusActors( class'NavigationPoint', N, 300 )
+		BestDist = 700;
+		ForEach Dest.RadiusActors( class'NavigationPoint', N, 500 )
 			if ( N != Dest )
 			{
 				Vect = N.Location - Dest.Location;
@@ -520,6 +547,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	local int Limit;
 	local int BotID;
 	local float BotState;
+	local ScriptedPawn Enemy;
 	local bool bAttract;
 
 	if ( aBot.LastAttractCheck == Level.TimeSeconds )
@@ -555,14 +583,23 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		if ( BotState < 1.5 ) 
 			return False;
 		//8 seconds prioritizing monsters
-		if ( aBot.Enemy != None && (BotState < 4) )
+		Enemy = ScriptedPawn(aBot.Enemy);
+		if ( Enemy == None )	Enemy = ScriptedPawn(aBot.OrderObject);
+		if ( Enemy == None )	Enemy = ReachableEnemy;
+		if ( Enemy != None && (BotState < 4) )
 		{
-			if ( AttractTo( aBot, aBot.Enemy) )
+			if ( AttractTo( aBot, Enemy) )
 			{
-				if ( aBot.MoveTarget == aBot.Enemy ) //Don't charge
+				if ( (aBot.Enemy == Enemy && Enemy.bIsBoss) || ReachableEnemy == None || ReachableEnemy.bDeleteMe )
+					ReachableEnemy = Enemy;
+				if ( aBot.OrderObject == None || aBot.OrderObject.bDeleteMe )
+					aBot.OrderObject = Enemy;
+				if ( aBot.MoveTarget == Enemy ) //Don't charge
 					return False;
 				Goto ATTRACT_DEST;
 			}
+			else if ( Enemy == ReachableEnemy )
+				ReachableEnemy = None;
 		}
 		
 		//Otherwise prioritize the main objectives (sorted by priority)
@@ -631,6 +668,21 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		}
 		if ( NewDest != None )
 			Goto ATTRACT_DEST;
+			
+		//Defer to enemy if failed to find objective
+		if ( Enemy != None && BotState >= 4 )
+		{
+			if ( AttractTo( aBot, Enemy) )
+			{
+				aBot.OrderObject = Enemy;
+				if ( aBot.MoveTarget == Enemy ) //Don't charge
+					return False;
+				Goto ATTRACT_DEST;
+			}
+			else if ( Enemy == ReachableEnemy )
+				ReachableEnemy = None;
+		}
+		bQueryEnemies = (FRand() < 0.01) || (ReachableEnemy == None);
 	}
 	return False;
 ATTRACT_DEST:
@@ -642,14 +694,6 @@ ATTRACT_DEST:
 //****************************************
 // Utilitary methods
 // XC versions are used in XC_Engine servers
-
-//Called once per monster
-function ProcessMonster( ScriptedPawn S)
-{
-	if ( (S.default.AttitudeToPlayer != ATTITUDE_Friendly) && !S.IsA('Nali') && !S.IsA('Cow') ) //Will this fix 1337 mercenary?
-		S.AttitudeToPlayer = ATTITUDE_Hate;
-	SetPawnDifficulty(MonsterSkill,S);
-}
 
 //Monster counter
 function CountMonsters()

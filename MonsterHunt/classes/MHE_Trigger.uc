@@ -6,12 +6,43 @@ var MHE_Base ToggledDoor; //Fix later
 var bool bIsSlave; //Do not create interface
 var bool bNotifyTriggerEnable;
 var bool bNotifyTriggerHit;
+var bool bTriggersMover;
+var bool bTriggersDoor;
+var bool bTriggersCounter;
+var bool bTriggersPawn;
+var bool bTriggersFactory;
 
 function RegisterTrigger( Trigger Other)
 {
 	MarkedTrigger = Other;
 	SetTimer( 1 + FRand() * 0.2, true);
+	Analyze();
 	SetTag();
+}
+
+function Analyze()
+{
+	local Actor A;
+	
+	ForEach AllActors( class'Actor', A, MarkedTrigger.Event)
+	{
+		if ( A.IsA('Mover') )
+		{
+			bTriggersMover = true;
+		}
+		else if ( A.IsA('Counter') )
+		{
+			bTriggersCounter = true;
+		}
+		else if ( A.bIsPawn )
+		{
+			bTriggersPawn = true;
+		}
+		else if ( A.IsA('ThingFactory') )
+		{
+			bTriggersFactory = true;
+		}
+	}
 }
 
 function SetTag()
@@ -67,4 +98,9 @@ event Timer()
 			Discover();
 			return;
 		}
+}
+
+defaultproperties
+{
+	DeferToMode=DTM_InCollision
 }
