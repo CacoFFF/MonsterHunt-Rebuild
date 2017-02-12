@@ -2,20 +2,26 @@ class MHI_Base expands Info;
 
 var MonsterBriefing Briefing;
 var MHI_Base NextEvent;
+var MHI_Base NextHint;
 var int TargetNUF;
 
 var int DrawY;
+var vector ScreenOffset; //X=horiz, Y=vert, Z=front (bigger means further in screen concept, should be 0 to MaxX/500)
 
 var int TimeStamp;
 var int EventIndex;
 var int OldIndex;
 var bool bDormant;
+var bool bDrawEvent; //Draw on ScoreBoard, def=True
+var bool bIsHint; //HINT IS 100% SIMULATED, def=False
 
 
 replication
 {
 	reliable if ( Role == ROLE_Authority )
 		EventIndex, TimeStamp;
+	reliable if ( bNetInitial && Role == ROLE_Authority )
+		bIsHint;
 }
 
 event PostBeginPlay()
@@ -30,6 +36,8 @@ event PostBeginPlay()
 		TimeStamp = Briefing.CurrentTime;
 		OldIndex = EventIndex;
 		Briefing.InsertIEvent( self);
+		if ( bIsHint )
+			Briefing.InsertHint( self);
 	}
 }
 
@@ -38,6 +46,8 @@ simulated event PostNetBeginPlay()
 	ForEach AllActors( class'MonsterBriefing', Briefing)
 	{
 		Briefing.InsertIEvent( self);
+		if ( bIsHint )
+			Briefing.InsertHint( self);
 		break;
 	}
 }
@@ -45,7 +55,11 @@ simulated event PostNetBeginPlay()
 simulated event Destroyed()
 {
 	if ( Briefing != None )
+	{
 		Briefing.RemoveIEvent( self);
+		if ( bIsHint )
+			Briefing.RemoveHint( self);
+	}
 }
 
 simulated final function bool IsTopInterface()
@@ -62,7 +76,7 @@ simulated final function MoveToTop()
 		Briefing.InsertIEvent(self);
 	}
 }
-
+simulated function bool DrawHint( Canvas Canvas, MonsterHUD MH);
 //Canvas clips and base positions must be preset!
 simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB);
 
@@ -99,5 +113,6 @@ Begin:
 defaultproperties
 {
 	bAlwaysRelevant=True
+	bDrawEvent=True
 	NetUpdateFrequency=2
 }

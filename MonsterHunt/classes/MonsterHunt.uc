@@ -544,7 +544,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	local float ChanceW;
 	local MonsterEnd E;
 	local Actor NewDest;
-	local int Limit;
+	local int Limit, MonsterLimit;
 	local int BotID;
 	local float BotState;
 	local ScriptedPawn Enemy;
@@ -582,11 +582,17 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		//3 seconds for inventory grabbing
 		if ( BotState < 1.5 ) 
 			return False;
-		//8 seconds prioritizing monsters
+			
+			
+		//8-12 seconds prioritizing monsters (if MonsterLimit is too low the bot bounces back and forth!!)
+		MonsterLimit = 4
+		+ int(ScriptedPawn(aBot.OrderObject) != None) * 2
+		+ Limit / 8;
+
 		Enemy = ScriptedPawn(aBot.Enemy);
 		if ( Enemy == None )	Enemy = ScriptedPawn(aBot.OrderObject);
 		if ( Enemy == None )	Enemy = ReachableEnemy;
-		if ( Enemy != None && (BotState < 4) )
+		if ( Enemy != None && (BotState < MonsterLimit) )
 		{
 			if ( AttractTo( aBot, Enemy) )
 			{
@@ -652,25 +658,18 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		}
 
 		For ( E=EndList ; E!=None ; E=E.NextEnd )
-		{
-			if ( true/*E.bCollideActors && E.bInitiallyActive &&*/ )
+			if ( (E.DeferTo != None && AttractTo( aBot, E.DeferTo, true)) || (E.DeferTo == None && AttractTo( aBot, E)) )
 			{
-				if ( E.DeferTo != None )
-					bAttract = AttractTo( aBot, E.DeferTo, true);
-				else
-					bAttract = AttractTo( aBot, E);
-				if ( bAttract )
-				{
-					NewDest = aBot.MoveTarget; //Jumping outside a ForEach iterator is very ugly, avoid it
-					break;
-				}
+				NewDest = aBot.MoveTarget;
+				if ( E.bCollideActors && E.bInitiallyActive ) //Prioritize 
+					Goto ATTRACT_DEST;
 			}
-		}
+
 		if ( NewDest != None )
 			Goto ATTRACT_DEST;
-			
+
 		//Defer to enemy if failed to find objective
-		if ( Enemy != None && BotState >= 4 )
+		if ( Enemy != None && BotState >= MonsterLimit )
 		{
 			if ( AttractTo( aBot, Enemy) )
 			{

@@ -12,10 +12,10 @@ var bool bCompleted;
 
 var enum EDeferToMode
 {
+	DTM_None,
 	DTM_Nearest,
 	DTM_InCollision,
-	DTM_NearestVisible,
-	DTM_None
+	DTM_NearestVisible
 } DeferToMode;
 
 native(3553) final iterator function DynamicActors( class<actor> BaseClass, out actor Actor, optional name MatchTag );

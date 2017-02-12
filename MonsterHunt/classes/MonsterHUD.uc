@@ -13,6 +13,9 @@ class MonsterHUD expands ChallengeTeamHUD
 #exec Texture Import File=pcx\HUD_DampenerON.pcx Name=HUD_DampenerON Mips=Off Group=HUD Flags=2
 #exec Texture Import File=pcx\HUD_DampenerOFF.pcx Name=HUD_DampenerOFF Mips=Off Group=HUD Flags=2
 #exec Texture Import File=pcx\HUD_DampenerModu.pcx Name=HUD_DampenerModu Mips=Off Group=HUD Flags=2
+#exec Texture Import File=pcx\PlatesBase.pcx Name=PlatesBase Mips=Off Group=HUD Flags=2
+#exec Texture Import File=pcx\PlatesModu.pcx Name=PlatesModu Mips=Off Group=HUD Flags=64
+
 
 
 var UDamage CachedAmp;
@@ -24,10 +27,18 @@ var float DecimalTimer;
 var float AddedYSynopsis;
 var int PickupCounter;
 var localized string IdentifyArmor;
+var MonsterBriefing Briefing;
 
 
 var color ProtectionColors[3];
 
+
+simulated event PostBeginPlay()
+{
+	Super.PostBeginPlay();
+	ForEach AllActors( class'MonsterBriefing', Briefing)
+		break;
+}
 
 //Timer control
 simulated function Tick( float DeltaTime)

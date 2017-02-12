@@ -5,7 +5,7 @@
 // Hold up to 32 events to alleviate load on netcode (server)
 class MonsterBriefing expands Info;
 
-var MHI_Base InterfaceEventList;
+var MHI_Base InterfaceEventList, HintList;
 var MHE_Base MapEventList;
 var int CurrentIndex;
 var int CurrentTime;
@@ -13,17 +13,31 @@ var int IEventCount;
 var bool bReady;
 
 //PostNetBeginPlay fails to execute, likely due to Role/NativeReplication code
+//BTW this actor could be ported to be 100% controlled by the client (not replicated, one less channel)
 simulated event PostBeginPlay()
 {
 	local MHI_Base IEvent;
+	local MonsterHUD MHUD;
+	local MonsterBoard MB;
 
 	if ( Level.NetMode == NM_Client )
 	{
 		ForEach AllActors( class'MHI_Base', IEvent)
+		{
 			InsertIEvent( IEvent);
+			if ( IEvent.bIsHint )
+				InsertHint( IEvent);
+		}
+		//Register on client HUD as soon as it's spawned
+		ForEach AllActors( class'MonsterHUD', MHUD)
+		{
+			MHUD.Briefing = self;
+			break;
+		}
 	}
 	else
 		InitialState = 'Server';
+
 }
 
 
@@ -130,6 +144,35 @@ simulated function RemoveIEvent( MHI_Base IEvent)
 	}
 	IEvent.NextEvent = None;
 	IEventCount--;
+}
+
+simulated function InsertHint( MHI_Base Hint)
+{
+	local MHI_Base MHI;
+	For ( MHI=HintList ; MHI!=None ; MHI=MHI.NextHint ) //Critical
+		if ( MHI == Hint )
+			return;
+	Hint.NextHint = HintList;
+	HintList = Hint;
+	Hint.bIsHint = true;
+}
+
+simulated function RemoveHint( MHI_Base Hint)
+{
+	local MHI_Base MHI;
+	Hint.bIsHint = false;
+	if ( HintList == Hint )
+		HintList = Hint.NextHint;
+	else
+	{
+		For ( MHI=HintList ; MHI!=None ; MHI=MHI.NextHint )
+			if ( MHI.NextHint == Hint )
+			{
+				MHI.NextHint = Hint.NextHint;
+				break;
+			}
+	}
+	Hint.NextHint = None;
 }
 
 function RemoveEvent( MHE_Base MEvent)
