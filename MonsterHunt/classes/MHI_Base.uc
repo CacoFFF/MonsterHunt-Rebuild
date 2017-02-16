@@ -6,7 +6,9 @@ var MHI_Base NextHint;
 var int TargetNUF;
 
 var int DrawY;
+var int HintY;
 var vector ScreenOffset; //X=horiz, Y=vert, Z=front (bigger means further in screen concept, should be 0 to MaxX/500)
+var Texture HintIcon;
 
 var int TimeStamp;
 var int EventIndex;
@@ -76,10 +78,10 @@ simulated final function MoveToTop()
 		Briefing.InsertIEvent(self);
 	}
 }
-simulated function bool DrawHint( Canvas Canvas, MonsterHUD MH);
+
 //Canvas clips and base positions must be preset!
 simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB);
-
+simulated function bool DrawHint( Canvas Canvas, MonsterHUD MH);
 
 
 //*************************************************
@@ -115,4 +117,5 @@ defaultproperties
 	bAlwaysRelevant=True
 	bDrawEvent=True
 	NetUpdateFrequency=2
+	HintIcon=Texture'UnrealShare.S_Alarm'
 }

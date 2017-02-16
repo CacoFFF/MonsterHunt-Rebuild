@@ -377,12 +377,13 @@ function ShowScores(Canvas Canvas)
 		//Calculate size of black box
 		ruX = tableHeaderHeight;
 		For ( MHI=Briefing.InterfaceEventList ; MHI!=None ; MHI=MHI.NextEvent )
-		{
-			i++;
-			ruX += MHI.DrawY;
-			if ( MHI.DrawY <= 0 || ruX >= avgY )
-				break;
-		}
+			if ( MHI.bDrawEvent )
+			{
+				i++;
+				ruX += MHI.DrawY;
+				if ( MHI.DrawY <= 0 || ruX >= avgY )
+					break;
+			}
 		Canvas.DrawRect( texture'shade2', tableWidth , ruX );
 
 		//Draw header
@@ -406,22 +407,25 @@ function ShowScores(Canvas Canvas)
 		ruX = 0;
 		while ( (i>0) && (MHI!=None) )
 		{
-			//Draw Timestamp here
-			Canvas.Font = PtsFont12;
-			Canvas.DrawColor = BrightGold;
-			Canvas.SetPos( 0, ruX+1);
-			Canvas.DrawText( TimeToClock(MHI.TimeStamp) );
-			
-			Canvas.OrgX += 50;
+			if ( MHI.bDrawEvent )
+			{
+				//Draw Timestamp here
+				Canvas.Font = PtsFont12;
+				Canvas.DrawColor = BrightGold;
+				Canvas.SetPos( 0, ruX+1);
+				Canvas.DrawText( TimeToClock(MHI.TimeStamp) );
+				
+				Canvas.OrgX += 50;
 
-			//Draw event here
-			Canvas.Font = Font'UnrealShare.WhiteFont'; //Default font
-			Time = MHI.DrawEvent( Canvas, ruX, self);
-			MHI.DrawY = Time; //Update Y coords
-			ruX += Time;
-			
-			Canvas.OrgX -= 50;
-			i--;
+				//Draw event here
+				Canvas.Font = Font'UnrealShare.WhiteFont'; //Default font
+				Time = MHI.DrawEvent( Canvas, ruX, self);
+				MHI.DrawY = Time; //Update Y coords
+				ruX += Time;
+				
+				Canvas.OrgX -= 50;
+				i--;
+			}
 			MHI=MHI.NextEvent;
 		}
 		

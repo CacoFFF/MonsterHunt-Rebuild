@@ -281,17 +281,34 @@ function bool ChangeTeam(Pawn Other, int NewTeam)
 	return Result;
 }
 
-function Killed (Pawn Killer, Pawn Other, name DamageType)
+function Killed( Pawn Killer, Pawn Other, name DamageType)
 {
-	Super.Killed( Killer, Other, DamageType);
-	if ( (ScriptedPawn(Killer) != None) && (Other.PlayerReplicationInfo != None) ) //Weird bug... fix?
-	{
-		Other.PlayerReplicationInfo.Deaths += 1;
-		if ( ReachableEnemy == None || ReachableEnemy.bDeleteMe || ScriptedPawn(Killer).bIsBoss )
-			ReachableEnemy = ScriptedPawn(Killer);
-	}
+	if ( ScriptedPawn(Killer) != None )
+		MonsterKill( ScriptedPawn(Killer), Other);
+	else
+		Super.Killed( Killer, Other, DamageType);
+
+
 	if ( (Lives > 0) && Other.bIsPlayer && (Other.PlayerReplicationInfo != None) && (Other.PlayerReplicationInfo.Deaths >= Lives) )
 		bCheckEndLivesAgain = true;
+}
+
+function MonsterKill( ScriptedPawn Killer, Pawn Other)
+{
+	if ( Other == None || Killer == None )
+		return;
+
+	Other.DieCount++;
+	Killer.KillCount++;
+	BaseMutator.ScoreKill(Killer, Other);
+		
+	if ( Other.PlayerReplicationInfo != None )
+	{
+		Other.PlayerReplicationInfo.Deaths += 1;
+		Other.PlayerReplicationInfo.Score -= 5;
+		if ( ReachableEnemy == None || ReachableEnemy.bDeleteMe || Killer.bIsBoss )
+			ReachableEnemy = Killer;
+	}
 }
 
 function ScoreKill( Pawn Killer, Pawn Other)
@@ -351,8 +368,6 @@ function ScoreKill( Pawn Killer, Pawn Other)
 			{
 				if ( Killer == Other )
 					Killer.PlayerReplicationInfo.Score -= 4;
-				else if ( ScriptedPawn(Killer) != None )
-					Killer.PlayerReplicationInfo.Score -= 5;
 			}
 		}
 	}
@@ -469,6 +484,17 @@ function int NearbyTeammates_XC( Pawn Other, float Distance, bool bVisible)
 		i++;
 	}
 	return i;
+}
+
+//Returns whether this objective should cause bot attraction
+function Actor ValidateObjective( Pawn Other, Actor Objective)
+{
+	if ( Objective == None || Objective.bDeleteMe )
+		return None;
+	if ( Objective.bIsPawn && (Pawn(Objective).Health > 0) )
+		return Objective;
+//	if ( MonsterWaypoint(Objective) != None && MonsterWaypoint(
+// Later
 }
 
 

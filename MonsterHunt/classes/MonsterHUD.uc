@@ -98,6 +98,8 @@ simulated function PostRender( Canvas Canvas )
 		bHideHUD = true;
 	}
 	
+	if ( (Briefing != None) && (Briefing.HintList != None) && !PlayerOwner.bBehindView )
+		DrawHints( Canvas);
 	Super.PostRender( Canvas);
 	
 	//Log spam on watching non-player fix END
@@ -566,6 +568,59 @@ simulated function DrawStatus(Canvas Canvas)
 	}
 	
 }
+
+//***************************************************
+//******************** HINTS
+simulated function DrawHints( Canvas Canvas)
+{
+	local vector V, X, Y, Z;
+	local float InvMaxWidth;
+	local MHI_Base Hint;
+	local vector ScreenCoords;
+	local vector MidPoints;
+	local float ClipX, ClipY;
+	
+//	MaxWidth = tan((PlayerOwner.FOVAngle / 360) * pi); //1 if 90º, lower if less, bigger if more
+	GetAxes( PawnOwner.ViewRotation, X, Y, Z);
+	ClipX = Canvas.ClipX;
+	ClipY = Canvas.ClipY;
+	InvMaxWidth = 1 / tan( PlayerOwner.FOVAngle * 0.008727); //Optimization
+	MidPoints.X = ClipX * 0.5;
+	MidPoints.Y = ClipY * 0.5;
+	Canvas.DrawColor = WhiteColor;
+	Canvas.Style = ERenderStyle.STY_Translucent;
+
+	For ( Hint=Briefing.HintList ; Hint!=None ; Hint=Hint.NextHint )
+	{
+		V = Hint.Location - PawnOwner.Location;
+		V.Z -= PawnOwner.EyeHeight;
+		
+		//Need proximity test for selecting nearest hint here
+		
+		//X=h-distance from crosshair
+		//Y=v-distance from crosshair (flipped, higher means below)
+		//Z=depth
+		
+		ScreenCoords.Z = (V dot X);
+		if ( ScreenCoords.Z < 0 || ScreenCoords.Z > 10000 )
+			continue; //Off-depth
+		ScreenCoords.X = (V dot Y);
+		if ( ScreenCoords.Z < Abs(ScreenCoords.X * InvMaxWidth) )
+			continue; //Off the horizontal FOV
+		ScreenCoords.Y = -(V dot Z);
+		ScreenCoords *= MidPoints.X * InvMaxWidth / ScreenCoords.Z; //Transform to unitary coords
+		ScreenCoords.Z *= 0.001;
+		Canvas.DrawColor = WhiteColor * (1 - VSize(ScreenCoords)/ClipX);
+		ScreenCoords += MidPoints + Hint.ScreenOffset; //Transform to canvas coords
+	
+		if ( ScreenCoords.Y < 16 || ScreenCoords.Y > ClipX - 16 )
+			continue;
+		Canvas.SetPos( ScreenCoords.X - 16, ScreenCoords.Y - 16);
+		Canvas.DrawIcon( Hint.HintIcon, 1);
+
+	}
+}
+
 
 simulated function LocalizedMessage( class<LocalMessage> Message, optional int Switch, optional PlayerReplicationInfo RelatedPRI_1, optional PlayerReplicationInfo RelatedPRI_2, optional Object OptionalObject, optional String CriticalString )
 {

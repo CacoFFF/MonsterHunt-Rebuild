@@ -9,7 +9,6 @@ var MHI_Base InterfaceEventList, HintList;
 var MHE_Base MapEventList;
 var int CurrentIndex;
 var int CurrentTime;
-var int IEventCount;
 var bool bReady;
 
 //PostNetBeginPlay fails to execute, likely due to Role/NativeReplication code
@@ -58,11 +57,11 @@ state Server
 		CurrentTime++;
 		
 		//Get rid of excess dormant events
-		if ( (IEventCount >= 32) && (CurrentTime % 4 == 0) ) //Every 4 seconds
+		if ( CurrentTime % 4 == 0 ) //Every 4 seconds
 		{
 			For ( MHI=InterfaceEventList ; MHI!=None ; MHI=MHI.NextEvent )
 			{
-				if ( i++ >= 32 )
+				if ( MHI.bDrawEvent && (i++ >= 32) )
 				{
 					if ( MHI.bDormant ) //Boom
 					{
@@ -90,11 +89,22 @@ state Server
 			if ( TF.Prototype != None && ClassIsChildOf(TF.Prototype, Class'ScriptedPawn') && TF.Capacity > 1 )
 				Spawn( class'MHE_MonsterSpawner').RegisterFactory( TF);
 	}
+	
+	function GenerateTranslatorEvents()
+	{
+		local TranslatorEvent TE;
+		ForEach AllActors (class'TranslatorEvent', TE)
+			if ( TE.Hint != "" || TE.Message != "" || TE.AltMessage != "" )
+				Spawn( class'MHE_TranslatorMessage').RegisterEvent( TE);
+	}
+	
 Begin:
 	Sleep( 0.01);
 	GenerateCriticalEvents();
 	Sleep( 0.01);
 	GenerateSpawners();
+	Sleep( 0.01);
+	GenerateTranslatorEvents();
 }
 
 
@@ -125,7 +135,6 @@ simulated function InsertIEvent( MHI_Base IEvent)
 			}
 		}
 	}
-	IEventCount++;
 }
 
 simulated function RemoveIEvent( MHI_Base IEvent)
@@ -143,7 +152,6 @@ simulated function RemoveIEvent( MHI_Base IEvent)
 			}
 	}
 	IEvent.NextEvent = None;
-	IEventCount--;
 }
 
 simulated function InsertHint( MHI_Base Hint)
