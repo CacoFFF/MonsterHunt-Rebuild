@@ -81,7 +81,7 @@ simulated final function MoveToTop()
 
 //Canvas clips and base positions must be preset!
 simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB);
-simulated function bool DrawHint( Canvas Canvas, MonsterHUD MH);
+simulated function int DrawHint( Canvas Canvas, MonsterHUD MH);
 
 
 //*************************************************

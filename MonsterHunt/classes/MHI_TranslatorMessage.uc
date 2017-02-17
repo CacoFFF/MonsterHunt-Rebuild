@@ -22,6 +22,14 @@ event Timer()
 		Destroy();
 }
 
+function int DrawHint( Canvas Canvas, MonsterHUD MHUD)
+{
+	Canvas.SetPos( 0, 0);
+	Canvas.Font = Font'Engine.MedFont'; //Keeps the old feeling
+	Canvas.DrawText( Message, false);
+	return Canvas.CurY;
+}
+
 defaultproperties
 {
 	bIsHint=True

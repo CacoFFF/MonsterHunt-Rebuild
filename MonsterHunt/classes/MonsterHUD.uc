@@ -25,6 +25,7 @@ var Texture CachedDoll;
 var Texture CachedBelt;
 var float DecimalTimer;
 var float AddedYSynopsis;
+var float LastDelta;
 var int PickupCounter;
 var localized string IdentifyArmor;
 var MonsterBriefing Briefing;
@@ -44,6 +45,7 @@ simulated event PostBeginPlay()
 simulated function Tick( float DeltaTime)
 {
 	Super.Tick( DeltaTime);
+	LastDelta = DeltaTime;
 	if ( (DecimalTimer += DeltaTime) >= 0.1 )
 	{
 		DecimalTimer -= 0.1;
@@ -575,8 +577,8 @@ simulated function DrawHints( Canvas Canvas)
 {
 	local vector V, X, Y, Z;
 	local float InvMaxWidth;
-	local MHI_Base Hint;
-	local vector ScreenCoords;
+	local MHI_Base Hint, NearestToMidHint;
+	local vector ScreenCoords, NearestToMidCoords;
 	local vector MidPoints;
 	local float ClipX, ClipY;
 	
@@ -587,9 +589,10 @@ simulated function DrawHints( Canvas Canvas)
 	InvMaxWidth = 1 / tan( PlayerOwner.FOVAngle * 0.008727); //Optimization
 	MidPoints.X = ClipX * 0.5;
 	MidPoints.Y = ClipY * 0.5;
+	NearestToMidCoords = MidPoints * 0.7;
 	Canvas.DrawColor = WhiteColor;
 	Canvas.Style = ERenderStyle.STY_Translucent;
-
+	
 	For ( Hint=Briefing.HintList ; Hint!=None ; Hint=Hint.NextHint )
 	{
 		V = Hint.Location - PawnOwner.Location;
@@ -600,6 +603,7 @@ simulated function DrawHints( Canvas Canvas)
 		//X=h-distance from crosshair
 		//Y=v-distance from crosshair (flipped, higher means below)
 		//Z=depth
+		
 		
 		ScreenCoords.Z = (V dot X);
 		if ( ScreenCoords.Z < 0 || ScreenCoords.Z > 10000 )
@@ -613,11 +617,73 @@ simulated function DrawHints( Canvas Canvas)
 		Canvas.DrawColor = WhiteColor * (1 - VSize(ScreenCoords)/ClipX);
 		ScreenCoords += MidPoints + Hint.ScreenOffset; //Transform to canvas coords
 	
-		if ( ScreenCoords.Y < 16 || ScreenCoords.Y > ClipX - 16 )
+		if ( ScreenCoords.Y*0.8 < 16 || ScreenCoords.Y*1.2 > ClipX - 16 ) //Do not touch upper or lower borders
 			continue;
 		Canvas.SetPos( ScreenCoords.X - 16, ScreenCoords.Y - 16);
 		Canvas.DrawIcon( Hint.HintIcon, 1);
 
+		if ( VSize(ScreenCoords-MidPoints) < VSize(NearestToMidCoords-MidPoints) )
+		{
+			NearestToMidCoords = ScreenCoords;
+			NearestToMidHint = Hint;
+		}
+	}
+	
+	if ( NearestToMidHint != None )
+	{
+		ScreenCoords.X = 60 + Canvas.ClipX * 0.2;
+		ScreenCoords.Z = 0; //Lower res uses other box
+		Canvas.OrgX = NearestToMidCoords.X + 16;
+		if ( NearestToMidCoords.X < MidPoints.X )
+			Canvas.OrgX -= ScreenCoords.X + 32;
+		Canvas.OrgY = NearestToMidCoords.Y;
+
+		//Detail-scaling later
+		//This is low res box
+		ScreenCoords.Y = fMax( 1, NearestToMidHint.HintY - 16); //Small res, big res doesn't substract 16
+		Canvas.Font = MyFonts.GetSmallFont( Canvas.ClipX*1.1);
+		Canvas.Style = ERenderStyle.STY_Modulated;
+		Canvas.SetPos( 0, 0);
+		Canvas.DrawTile( Texture'PlatesModu', 16, 16, 32/*low res=32, hi res=0*/, 0, 16, 16);
+		Canvas.DrawTile( Texture'PlatesModu', ScreenCoords.X-32, 16, 48, 0, 1, 16);
+		Canvas.DrawTile( Texture'PlatesModu', 16, 16, 48, 0, 16, 16);
+		Canvas.SetPos( 0, 16);
+		Canvas.DrawTile( Texture'PlatesModu', 16, ScreenCoords.Y, 32/*low res=32, hi res=0*/, 16, 16, 1);
+		Canvas.DrawTile( Texture'PlatesModu', ScreenCoords.X-32, ScreenCoords.Y, 48, 16, 1, 1);
+		Canvas.DrawTile( Texture'PlatesModu', 16, ScreenCoords.Y, 48, 16, 16, 1);
+		Canvas.SetPos( 0, 16+ScreenCoords.Y);
+		Canvas.DrawTile( Texture'PlatesModu', 16, 16, 32/*low res=32, hi res=0*/, 16, 16, 16);
+		Canvas.DrawTile( Texture'PlatesModu', ScreenCoords.X-32, 16, 48, 16, 1, 16);
+		Canvas.DrawTile( Texture'PlatesModu', 16, 16, 48, 16, 16, 16);
+
+		Canvas.DrawColor = TeamColor[0];
+		Canvas.Style = ERenderStyle.STY_Translucent;
+		Canvas.SetPos( 0, 0);
+		Canvas.DrawTile( Texture'PlatesBase', 16, 16, 32/*low res=32, hi res=0*/, 0, 16, 16);
+		Canvas.DrawTile( Texture'PlatesBase', ScreenCoords.X-32, 16, 48, 0, 1, 16);
+		Canvas.DrawTile( Texture'PlatesBase', 16, 16, 48, 0, 16, 16);
+		Canvas.SetPos( 0, 16);
+		Canvas.DrawTile( Texture'PlatesBase', 16, ScreenCoords.Y, 32/*low res=32, hi res=0*/, 16, 16, 1);
+		Canvas.DrawTile( Texture'PlatesBase', ScreenCoords.X-32, ScreenCoords.Y, 48, 16, 1, 1);
+		Canvas.DrawTile( Texture'PlatesBase', 16, ScreenCoords.Y, 48, 16, 16, 1);
+		Canvas.SetPos( 0, 16+ScreenCoords.Y);
+		Canvas.DrawTile( Texture'PlatesBase', 16, 16, 32/*low res=32, hi res=0*/, 16, 16, 16);
+		Canvas.DrawTile( Texture'PlatesBase', ScreenCoords.X-32, 16, 48, 16, 1, 16);
+		Canvas.DrawTile( Texture'PlatesBase', 16, 16, 48, 16, 16, 16);
+
+		Canvas.OrgX += 8; //16 in big res
+		Canvas.OrgY += 8;
+//		DrawTile( texture Tex, float XL, float YL, float U, float V, float UL, float VL );
+
+		Canvas.ClipX = ScreenCoords.X-16;
+		Canvas.ClipY = ScreenCoords.Y+16; //Plus none in big res... ugh?
+
+
+		NearestToMidHint.HintY = NearestToMidHint.DrawHint( Canvas, self); //Expand
+		Canvas.OrgX = 0;
+		Canvas.OrgY = 0;
+		Canvas.ClipX = ClipX;
+		Canvas.ClipY = ClipY;
 	}
 }
 
