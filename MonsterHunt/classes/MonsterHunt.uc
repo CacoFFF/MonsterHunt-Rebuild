@@ -21,14 +21,16 @@ var bool bQueryEnemies;
 var() config name MonsterKillType[10];
 var() config int MonsterKillScore[10];
 
-var string TimeOutMessage;
+var localized string TimeOutMessage;
 
-var MonsterWaypoint WaypointList;
-var MonsterEnd EndList;
-var MonsterAuthenticator AuthenticatorList;
-var MonsterBriefing Briefing;
-var MonsterTriggerMarker TriggerMarkers;
-var ScriptedPawn ReachableEnemy;
+var(Debug) MonsterWaypoint WaypointList;
+var(Debug) MonsterEnd EndList;
+var(Debug) MonsterAuthenticator AuthenticatorList;
+var(Debug) MonsterBriefing Briefing;
+var(Debug) MonsterTriggerMarker TriggerMarkers;
+var(Debug) ScriptedPawn ReachableEnemy;
+
+var(Debug) private int MonstersPerZone[64]; //ACCESSOR: GetMonstersPerZone( byte ZoneNumber)
 
 //********************
 // XC_Core / XC_Engine
@@ -41,12 +43,13 @@ native(3561) static final function bool RestoreFunction( class<Object> RestoreCl
 event InitGame(string Options, out string Error)
 {
 	local Mutator M;
+	local Actor A;
 	
 	//Force settings
 	bUseTranslocator = False; //Warning: TranslocDest points will be unlinked with this
 	bNoMonsters = False;
 	MaxAllowedTeams = 1;
-	
+
 	if ( int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 19 )
 	{
 		ReplaceFunction( class'MonsterBoard', class'MonsterBoard', 'GetCycles', 'GetCycles_XC');
@@ -601,9 +604,10 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		+ int(aBot.Orders == 'Attack')
 		+ int(aBot.Enemy == None) * 2
 		+ int(aBot.Weapon != none && aBot.Weapon.AiRating > 0.4 + FRand() * 0.2) * 2
-		+ int(aBot.Health > 60)
 		+ aBot.Health/150
-		+ NearbyTeammates(aBot, 500+aBot.Health, aBot.Enemy!=None) / 2;
+		+ NearbyTeammates(aBot, 500+aBot.Health, aBot.Enemy!=None) / 2
+		+ int(MonstersPerZone[aBot.Region.ZoneNumber] == 0)
+		- int(aBot.Health < 68);
 
 		BotState = BotState % Limit;
 		//3 seconds for inventory grabbing
@@ -721,16 +725,31 @@ ATTRACT_DEST:
 // Utilitary methods
 // XC versions are used in XC_Engine servers
 
+function ResetPerZoneCounter()
+{
+	local int i;
+	For ( i=0 ; i<64 ; i++ )
+		MonstersPerZone[i] = 0;
+}
+function int GetMonstersPerZone( byte ZoneNumber) //ACCESSOR
+{
+	if ( ZoneNumber >= 64 )
+		return 0;
+	return MonstersPerZone[ZoneNumber];
+}
+
 //Monster counter
 function CountMonsters()
 {
 	local int i, iB;
 	local Pawn P;
 	
+	ResetPerZoneCounter();
 	For ( P=Level.PawnList ; P!=None ; P=P.NextPawn )
 		if ( P.IsA('ScriptedPawn') && (P.Health > 0) )
 		{
 			i++; //Ignore friendly monsters?
+			MonstersPerZone[P.Region.ZoneNumber] += int(P.AttitudeToPlayer != ATTITUDE_Friendly);
 			if ( ScriptedPawn(P).bIsBoss )
 				iB++;
 			if ( P.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
@@ -748,11 +767,13 @@ function CountMonsters_XC()
 	local int i, iB;
 	local ScriptedPawn S;
 
+	ResetPerZoneCounter();
 	ForEach PawnActors (class'ScriptedPawn', S)
 	{
 		if ( S.Health > 0 )
 		{
 			i++; //Ignore friendly monsters?
+			MonstersPerZone[S.Region.ZoneNumber] += int(S.AttitudeToPlayer != ATTITUDE_Friendly);
 			if ( S.bIsBoss )
 				iB++;
 			if ( S.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
