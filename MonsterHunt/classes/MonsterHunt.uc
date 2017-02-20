@@ -284,7 +284,7 @@ function bool ChangeTeam(Pawn Other, int NewTeam)
 function Killed( Pawn Killer, Pawn Other, name DamageType)
 {
 	if ( ScriptedPawn(Killer) != None )
-		MonsterKill( ScriptedPawn(Killer), Other);
+		MonsterKill( ScriptedPawn(Killer), Other, DamageType);
 	else
 		Super.Killed( Killer, Other, DamageType);
 
@@ -293,7 +293,7 @@ function Killed( Pawn Killer, Pawn Other, name DamageType)
 		bCheckEndLivesAgain = true;
 }
 
-function MonsterKill( ScriptedPawn Killer, Pawn Other)
+function MonsterKill( ScriptedPawn Killer, Pawn Other, name DamageType)
 {
 	if ( Other == None || Killer == None )
 		return;
@@ -308,6 +308,7 @@ function MonsterKill( ScriptedPawn Killer, Pawn Other)
 		Other.PlayerReplicationInfo.Score -= 5;
 		if ( ReachableEnemy == None || ReachableEnemy.bDeleteMe || Killer.bIsBoss )
 			ReachableEnemy = Killer;
+		BroadcastMessage( Killer.KillMessage( DamageType, Other), false, 'DeathMessage');
 	}
 }
 
