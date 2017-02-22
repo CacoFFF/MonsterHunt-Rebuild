@@ -11,6 +11,7 @@ var NavigationPoint DeferTo;
 //Pointer to net breifing element!
 var bool bDiscovered;
 var bool bCompleted;
+var bool bPostInit;
 
 var enum EDeferToMode
 {

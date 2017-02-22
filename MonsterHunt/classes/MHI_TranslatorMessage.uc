@@ -1,6 +1,8 @@
 //Expires after 30 seconds of being hit
 class MHI_TranslatorMessage expands MHI_Base;
 
+#exec Texture Import File=pcx\HUD_TEvent.pcx Name=HUD_TEvent Mips=Off Group=HUD Flags=2
+
 var(MHI_Base) string Message, Hint;
 
 replication
@@ -35,4 +37,5 @@ defaultproperties
 	bIsHint=True
 	bDrawEvent=False
 	ScreenOffset=(Y=1)
+	HintIcon=Texture'HUD_TEvent'
 }

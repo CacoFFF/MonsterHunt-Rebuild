@@ -1,10 +1,12 @@
 class MHE_MonsterSpawner expands MHE_Base;
 
 var ThingFactory MarkedFactory;
+var MHE_Counter Counter;
 var int OriginalIndex;
 var int CountedPawns;
 var name ItemTag;
 var bool bWasSpawning;
+var bool bInterrupted;
 
 function RegisterFactory( ThingFactory Other)
 {
@@ -23,10 +25,12 @@ event Trigger( Actor Other, Pawn EventInstigator)
 
 function CheckState()
 {
+	bInterrupted = false;
 	if ( MarkedFactory == None || MarkedFactory.bDeleteMe || MarkedFactory.IsInState('Finished') || (MarkedFactory.Capacity == 0) )
 		bCompleted = true;
 	else if ( MarkedFactory.IsInState('Waiting') )
 	{
+		bInterrupted = bWasSpawning;
 	}
 	else if ( MarkedFactory.IsInState('Spawning') )
 	{
@@ -65,6 +69,7 @@ function UpdateInterface()
 	MHI = MHI_MonsterSpawner(Interface);
 	if ( MHI != None )
 	{
+		MHI.bSpawnInterrupted = bInterrupted;
 		if ( MHI.MonstersLeft != CountedPawns )
 		{
 			MHI.MonstersLeft = CountedPawns;
@@ -72,6 +77,13 @@ function UpdateInterface()
 			MHI.bSpawnFinished = bCompleted;
 			if ( !MHI.IsTopInterface() )
 				MHI.MoveToTop();
+		}
+		
+		if ( bInterrupted && (MHI.EventIndex != OriginalIndex) )
+		{
+			MHI.Briefing.RemoveIEvent( MHI);
+			MHI.EventIndex = OriginalIndex;
+			MHI.Briefing.InsertIEvent( MHI);
 		}
 		
 		if ( (MHI.CompletedAt == 0) && (CountedPawns == 0) )
