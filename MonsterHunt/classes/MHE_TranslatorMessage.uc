@@ -15,6 +15,14 @@ function RegisterEvent( TranslatorEvent NewEvent)
 
 event Trigger( Actor Other, Pawn EventInstigator)
 {
+	local Triggers T;
+	//Normal trigger doesn't pass itself as 'Other'
+	if ( (EventInstigator != None) && (Other == EventInstigator) )
+	{
+		ForEach EventInstigator.TouchingActors( class'Triggers', T)
+			if ( T.Event == Tag )
+				Other = T;
+	}
 	DisplayEvent( Other, EventInstigator);
 }
 
@@ -87,10 +95,11 @@ function DisplayEvent( Actor Medium, Pawn Other)
 	else
 		Medium.PlaySound( MarkedEvent.NewMessageSound, SLOT_Misc);
 	
-
 	Activator = Other;
 	Target = Medium;
 	UpdateInterface();
+	if ( Target == Other ) //Normal triggers cause the event to never go away!!
+		Target = None;
 }
 
 function UpdateInterface()
