@@ -29,6 +29,18 @@ function int DrawHint( Canvas Canvas, MonsterHUD MHUD)
 	Canvas.SetPos( 0, 0);
 	Canvas.Font = Font'Engine.MedFont'; //Keeps the old feeling
 	Canvas.DrawText( Message, false);
+	
+	if ( Hint != "" )
+	{
+		Canvas.Font = Font'UnrealShare.WhiteFont';
+		Canvas.CurX = 5;
+		Canvas.CurY += 4;
+		Canvas.DrawColor = MHUD.ProtectionColors[1];
+		Canvas.DrawText( "Hint:", false);
+		Canvas.CurX = 0;
+		Canvas.DrawText( Hint, false);
+	}
+	
 	return Canvas.CurY;
 }
 

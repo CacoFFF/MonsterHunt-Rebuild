@@ -634,7 +634,7 @@ simulated function DrawHints( Canvas Canvas)
 		ScreenCoords.X = 60 + Canvas.ClipX * 0.2;
 		ScreenCoords.Z = 0; //Lower res uses other box
 		Canvas.OrgX = NearestToMidCoords.X + 16;
-		if ( NearestToMidCoords.X < MidPoints.X )
+		if ( (NearestToMidCoords.X < MidPoints.X) && (NearestToMidCoords.Y < MidPoints.Y + 10) )
 			Canvas.OrgX -= ScreenCoords.X + 32;
 		Canvas.OrgY = NearestToMidCoords.Y;
 
@@ -678,8 +678,9 @@ simulated function DrawHints( Canvas Canvas)
 		Canvas.ClipX = ScreenCoords.X-16;
 		Canvas.ClipY = ScreenCoords.Y+16; //Plus none in big res... ugh?
 
-
+		Canvas.Style = ERenderStyle.STY_Masked;
 		NearestToMidHint.HintY = NearestToMidHint.DrawHint( Canvas, self); //Expand
+		Canvas.Style = ERenderStyle.STY_Translucent;
 		Canvas.OrgX = 0;
 		Canvas.OrgY = 0;
 		Canvas.ClipX = ClipX;
