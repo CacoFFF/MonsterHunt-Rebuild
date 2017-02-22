@@ -35,35 +35,44 @@ event Touch( Actor Other)
 event Timer()
 {
 	local Pawn P;
-	SetTimer( FRand() * Level.TimeDilation + 0.1, false);
-	
-	if ( (Interface != None) && (Interface.Briefing != None) )
-		Interface.TimeStamp = Interface.Briefing.CurrentTime; 
 
-	if ( (Activator != None) && !Activator.bDeleteMe && (Target != None) 
-	&& MHS.static.InCylinder(Activator.Location - Target.Location, Target.CollisionRadius+Activator.CollisionRadius, Target.CollisionHeight+Activator.CollisionHeight) )
+	if ( Interface == None || Interface.bDeleteMe )
 		return;
-	Activator = None;
-	if ( Target != None ) //Check self or trigger
+	//This trigger has been disabled, this event should not be displayed
+	else if ( (Trigger(Target) != None) && !Trigger(Target).bInitiallyActive )
 	{
-		ForEach Target.TouchingActors( class'Pawn', P)
-			if ( P.bIsPlayer && P.PlayerReplicationInfo != None )
-			{
-				Activator = P;
-				return;
-			}
-		Target = None;
+KILL_INTERFACE:
+		Interface.Destroy();
+		Interface = None;
+		SetTimer( 0, false);
+		return;
 	}
-	if ( Target != self ) //Check self if we have trigger
+	else if ( (Interface.Briefing == None) || (Interface.Briefing.CurrentTime > Interface.TimeStamp) )
+		Goto KILL_INTERFACE;
+	
+	if ( Activator == None || Activator.bDeleteMe ) //Try to pick up another activator
 	{
-		ForEach TouchingActors( class'Pawn', P)
-			if ( P.bIsPlayer && P.PlayerReplicationInfo != None )
-			{
-				Activator = P;
-				return;
-			}
-	}
-	SetTimer( 0, false); //Nobody is touching
+		if ( Target != None ) //Check self or trigger
+		{
+			ForEach Target.TouchingActors( class'Pawn', P)
+				if ( P.bIsPlayer && P.PlayerReplicationInfo != None )
+					Activator = P;
+		}
+		if ( Target != self ) //Check self if we have trigger
+		{
+			ForEach TouchingActors( class'Pawn', P)
+				if ( P.bIsPlayer && P.PlayerReplicationInfo != None )
+				{
+					Activator = P;
+					Target = self;
+				}
+		}
+	} //Else validate existing one
+	else if ( (Target != None) && !MHS.static.InCylinder(Activator.Location - Target.Location, Target.CollisionRadius+Activator.CollisionRadius, Target.CollisionHeight+Activator.CollisionHeight) )
+		Activator = None;
+
+	if ( Activator != None )
+		Interface.TimeStamp++; 
 }
 
 
@@ -89,7 +98,6 @@ function DisplayEvent( Actor Medium, Pawn Other)
 		return;
 	if ( (MarkedEvent.Message == "") && (MarkedEvent.Hint == "") )
 		return;
-	SetTimer( 0.1, false);
 	if ( !bDiscovered )
 		Discover();
 	else
@@ -100,6 +108,14 @@ function DisplayEvent( Actor Medium, Pawn Other)
 	UpdateInterface();
 	if ( Target == Other ) //Normal triggers cause the event to never go away!!
 		Target = None;
+	else if ( (Trigger(Target) != None) && !Trigger(Target).bInitiallyActive ) //This trigger self-disabled right away, do not consider it anymore
+		Target = None;
+
+	if ( Interface != None )
+	{
+		SetTimer( 1, true);
+		Timer();
+	}
 }
 
 function UpdateInterface()
@@ -118,10 +134,10 @@ function UpdateInterface()
 		MHI = Spawn( class'MHI_TranslatorMessage',,,V);
 		Interface = MHI;
 	}
-	else if ( MHI.Briefing != None )
-		MHI.TimeStamp = MHI.Briefing.CurrentTime;
 	
 	MHI.Message = MarkedEvent.Message;
 	MHI.Hint = MarkedEvent.Hint;
+	if ( MHI.Briefing != None )
+		MHI.TimeStamp = MHI.Briefing.CurrentTime + 10 + (Len(MHI.Hint)+Len(MHI.Message))/8;
 }
 

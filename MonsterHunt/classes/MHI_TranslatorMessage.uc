@@ -11,19 +11,6 @@ replication
 		Message, Hint;
 }
 
-
-event PostBeginPlay()
-{
-	Super.PostBeginPlay();
-	SetTimer(0.5, true);
-}
-
-event Timer()
-{
-	if ( Briefing == None || Briefing.bDeleteMe || (Briefing.CurrentTime - TimeStamp > 30) )
-		Destroy();
-}
-
 function int DrawHint( Canvas Canvas, MonsterHUD MHUD)
 {
 	Canvas.SetPos( 0, 0);
