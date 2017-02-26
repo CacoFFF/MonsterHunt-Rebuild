@@ -6,7 +6,7 @@
 class MonsterBriefing expands Info;
 
 var MHI_Base InterfaceEventList, HintList;
-var MHE_Base MapEventList;
+var MHE_Base MapEventList, TempEvent;
 var int CurrentIndex;
 var int CurrentTime;
 var bool bReady;
@@ -98,6 +98,32 @@ state Server
 				Spawn( class'MHE_TranslatorMessage').RegisterEvent( TE);
 	}
 	
+	function GenerateCounters()
+	{
+		local Counter C;
+		ForEach AllActors (class'Counter', C)
+			Spawn( class'MHE_Counter').RegisterCounter( C);
+	}
+	
+	//Post-Init events one by one, if all are inited in a single row, stop
+	function bool PostInit()
+	{
+		local int Initialized, Total;
+		
+		if ( TempEvent == None || TempEvent.bDeleteMe )
+		{
+			For ( TempEvent=MapEventList ; TempEvent!=None ; TempEvent=TempEvent.NextEvent )
+				if ( !TempEvent.bPostInit )
+					Goto INIT_EVENT;
+			return true;
+		}
+		
+	INIT_EVENT:
+		TempEvent.PostInit();
+		TempEvent = TempEvent.NextEvent;
+		return false;
+	}
+	
 Begin:
 	Sleep( 0.01);
 	GenerateCriticalEvents();
@@ -105,6 +131,11 @@ Begin:
 	GenerateSpawners();
 	Sleep( 0.01);
 	GenerateTranslatorEvents();
+	Sleep( 0.01);
+	GenerateCounters();
+	
+	While ( !PostInit() )
+		Sleep( 0.01);
 }
 
 
@@ -202,6 +233,6 @@ function RemoveEvent( MHE_Base MEvent)
 
 defaultproperties
 {
-	bAlwaysRelevant=True
 	NetUpdateFrequency=1
+	bAlwaysRelevant=True
 }

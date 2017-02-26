@@ -4,6 +4,7 @@ var ThingFactory MarkedFactory;
 var MHE_Counter Counter;
 var int OriginalIndex;
 var int CountedPawns;
+var int CountersTotal; //Cached at start
 var name ItemTag;
 var bool bWasSpawning;
 var bool bInterrupted;
@@ -54,12 +55,16 @@ function Discover()
 		MHI.MonsterName = Class<Pawn>(MarkedFactory.Prototype).default.MenuName;
 		if ( MHI.MonsterName == "" )
 			MHI.MonsterName = string(MarkedFactory.Prototype.Name);
+		if ( Counter != None )
+			MHI.CountersTotal = CountersTotal;
 	}
 }
 
 function UpdateInterface()
 {
 	local MHI_MonsterSpawner MHI;
+	local MHE_Counter C;
+	local int LowestC;
 
 	if ( MarkedFactory != None && !bCompleted )
 		CountedPawns = MarkedFactory.Capacity + MarkedFactory.NumItems;
@@ -77,6 +82,11 @@ function UpdateInterface()
 			MHI.bSpawnFinished = bCompleted;
 			if ( !MHI.IsTopInterface() )
 				MHI.MoveToTop();
+			if ( Counter != None )
+			{
+				MHI.CountersLeft = Counter.ActiveCounters();
+				MHI.NextCounterLowest = Counter.GetLowestCounter();
+			}
 		}
 		
 		if ( bInterrupted && (MHI.EventIndex != OriginalIndex) )

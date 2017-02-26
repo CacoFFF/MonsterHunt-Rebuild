@@ -28,7 +28,10 @@ function Discover()
 	bDiscovered = true;
 }
 
-function PostInit();
+function PostInit()
+{
+	bPostInit = true;
+}
 
 function FindDeferPoint()
 {

@@ -16,3 +16,14 @@ LiveFeed="Transmision en vivo de"
 
 [MonsterReplicationInfo]
 LocaleVersion=1
+
+[MHE_MonsterSpawner]
+TEXT_MonsterWave="Ola de monstruos"
+TEXT_IndividualEvent="Evento"
+TEXT_AllEvents="Todos los eventos"
+TEXT_FirstEvent="Primer evento"
+TEXT_NextEvent="Proximo evento"
+TEXT_LastEvent="Ultimo evento"
+TEXT_Finished="finalizado"
+TEXT_Interrupted="interrumpido"
+TEXT_Remaining="faltantes"
