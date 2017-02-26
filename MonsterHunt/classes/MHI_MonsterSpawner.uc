@@ -37,7 +37,7 @@ simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB)
 	Canvas.DrawColor = MB.Grey;
 	Canvas.SetPos( 0, YStart+3);
 	Canvas.DrawText( TEXT_MonsterWave $ ":" @ MonsterName, false);
-	Canvas.CurX += 3;
+	Canvas.CurX += 4;
 	if ( bSpawnFinished || bSpawnInterrupted)
 		Canvas.DrawColor = MB.Orange;
 	else
@@ -62,20 +62,22 @@ simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB)
 			else
 				Canvas.DrawText( TEXT_AllEvents, false);
 			Canvas.CurY = FY;
-			Canvas.CurX += 3;
+			Canvas.CurX += 4;
 			Canvas.DrawColor = MB.Orange;
 			Canvas.DrawText( TEXT_Finished $ ".", false);
 		}
 		else
 		{
-			if ( CountersTotal == CountersLeft )
+			if ( CountersTotal == 1 )
+				Canvas.DrawText( TEXT_IndividualEvent, false);
+			else if ( CountersTotal == CountersLeft )
 				Canvas.DrawText( TEXT_FirstEvent, false);
 			else if ( CountersLeft == 1 )
 				Canvas.DrawText( TEXT_LastEvent, false);
 			else
 				Canvas.DrawText( TEXT_NextEvent, false);
 			Canvas.CurY = FY;
-			Canvas.CurX += 3;
+			Canvas.CurX += 4;
 			Canvas.DrawColor = MB.BrightCyan;
 			Canvas.DrawText( string(NextCounterLowest) @ TEXT_Remaining $ ".", false);
 		}
