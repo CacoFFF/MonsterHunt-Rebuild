@@ -11,7 +11,7 @@ replication
 		Message, Hint;
 }
 
-function int DrawHint( Canvas Canvas, MonsterHUD MHUD)
+function int DrawHint( Canvas Canvas, MHCR_HUD MHUD)
 {
 	Canvas.SetPos( 0, 0);
 	Canvas.Font = Font'Engine.MedFont'; //Keeps the old feeling

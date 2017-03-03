@@ -131,7 +131,7 @@ function UpdateInterface()
 			V = Target.Location;
 		if ( (Activator != None) && !FastTrace(Activator.Location, V) )
 			V = Activator.Location + Normal(V - Activator.Location) * (Activator.CollisionRadius*0.5);
-		MHI = Spawn( class'MHI_TranslatorMessage',,,V);
+		MHI = Spawn( class'MHI_TranslatorMessage',self,,V);
 		Interface = MHI;
 	}
 	

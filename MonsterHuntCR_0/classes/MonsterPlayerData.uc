@@ -6,7 +6,7 @@
 class MonsterPlayerData expands ReplicationInfo;
 
 var MonsterPlayerData HashNext;
-var MonsterReplicationInfo MRI;
+var MonsterBriefing Briefing;
 var PlayerReplicationInfo PRI;
 
 
@@ -57,12 +57,12 @@ simulated event SetInitialState()
 	Super.SetInitialState();
 }
 
-//In clients this actor has to find the MRI
+//In clients this actor has to find the Briefing
 simulated event PostNetBeginPlay()
 {
-	ForEach AllActors (class'MonsterReplicationInfo', MRI)
+	ForEach AllActors (class'MonsterBriefing', Briefing)
 	{
-		MRI.LinkPlayerData( self);
+		Briefing.LinkPlayerData( self);
 		break;
 	}
 	bFlagCached = false;
@@ -112,8 +112,8 @@ function Activate( PlayerReplicationInfo NewPRI, string NewFingerPrint)
 simulated function DeActivate()
 {
 	bAuthenticated = false;
-	if ( MRI != None && !MRI.bDeleteMe )
-		MRI.UnlinkPlayerData( self);
+	if ( Briefing != None && !Briefing.bDeleteMe )
+		Briefing.UnlinkPlayerData( self);
 	//The clients will stop receiving this info and it'll auto-unlink as well (5 second delay)
 	if ( Level.NetMode != NM_Client )
 		bAlwaysRelevant = false;

@@ -10,19 +10,6 @@ Object=(Name=MonsterHunt.MonsterHuntArena,Class=Class,MetaClass=Botpack.Tourname
 Preferences=(Caption="Monster Arena",Parent="Game Types",Class=MonsterHunt.MonsterHuntArena,Immediate=True)
 Object=(Name=MonsterHunt.MonsterMenuItem,Class=Class,MetaClass=UMenu.UMenuModMenuItem,Description="&Monster Hunt Credits,The people behind Monster Hunt.")
 
-[MonsterHUD]
-IdentifyArmor=Armor:
-
 [MonsterReplicationInfo]
 LocaleVersion=1
 
-[MHE_MonsterSpawner]
-TEXT_MonsterWave="Monster wave"
-TEXT_IndividualEvent="Event"
-TEXT_AllEvents="All events"
-TEXT_FirstEvent="First event"
-TEXT_NextEvent="Next event"
-TEXT_LastEvent="Last event"
-TEXT_Finished="finished"
-TEXT_Interrupted="interrupted"
-TEXT_Remaining="remaining"

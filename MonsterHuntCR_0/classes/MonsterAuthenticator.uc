@@ -4,7 +4,8 @@ class MonsterAuthenticator expands Info
 	config(MonsterHunt);
 
 var MonsterAuthenticator NextAuthenticator;
-	
+var MonsterBriefing Briefing;
+
 var string FingerPrint;
 var config string MyPlayerID;
 var byte TeamSkin; //Temporary
@@ -28,8 +29,6 @@ simulated event PostBeginPlay()
 
 	if ( Level.NetMode != NM_Client )
 	{
-		NextAuthenticator = MonsterHunt(Level.Game).AuthenticatorList;
-		MonsterHunt(Level.Game).AuthenticatorList = self;
 		PlayerOwner = PlayerPawn(Owner);
 		InitialState = 'LocalAuth';
 		if ( PlayerOwner != None )
@@ -50,7 +49,7 @@ state LocalAuth
 {
 Begin:
 	Sleep( Level.TimeDilation * 0.5 * FRand() );
-	MonsterReplicationInfo(Level.Game.GameReplicationInfo).AuthFinished( self);
+	Briefing.AuthFinished( self);
 	Sleep( Level.TimeDilation );
 	Destroy();
 }
@@ -87,7 +86,7 @@ Begin:
 				Sleep( Level.TimeDilation);
 			//But wait until 10th second to create data holder
 			//We can fail here, but chances are minimal
-			MonsterReplicationInfo(Level.Game.GameReplicationInfo).AuthFinished( self);
+			Briefing.AuthFinished( self);
 		}
 		Sleep( Level.TimeDilation);
 	}
@@ -127,14 +126,14 @@ event Destroyed()
 {
 	local MonsterAuthenticator MA, Last;
 
-	For ( MA=MonsterHunt(Level.Game).AuthenticatorList ; MA!=None ; MA=MA.NextAuthenticator )
+	For ( MA=Briefing.AuthenticatorList ; MA!=None ; MA=MA.NextAuthenticator )
 	{
 		if ( MA == self )
 		{
 			if ( Last != None )
 				Last.NextAuthenticator = NextAuthenticator;
 			else
-				MonsterHunt(Level.Game).AuthenticatorList = NextAuthenticator;
+				Briefing.AuthenticatorList = NextAuthenticator;
 			NextAuthenticator = None;
 			break;
 		}

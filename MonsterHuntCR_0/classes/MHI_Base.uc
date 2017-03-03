@@ -31,9 +31,13 @@ event PostBeginPlay()
 	TargetNUF = NetUpdateFrequency;
 	if ( default.bNetTemporary )
 		bDormant = true;
-	if ( (MonsterHunt(Level.Game) != None) && (MonsterHunt(Level.Game).Briefing != None) )
+
+	if ( Briefing == None )
+		ForEach AllActors( class'MonsterBriefing', Briefing)
+			break;
+	
+	if ( Briefing != None )
 	{
-		Briefing = MonsterHunt(Level.Game).Briefing;
 		EventIndex = Briefing.CurrentIndex++;
 		TimeStamp = Briefing.CurrentTime;
 		OldIndex = EventIndex;
@@ -41,7 +45,10 @@ event PostBeginPlay()
 		if ( bIsHint )
 			Briefing.InsertHint( self);
 	}
+	else
+		Warn("MONSTER BRIEFING NOT FOUND!!!");
 }
+
 
 simulated event PostNetBeginPlay()
 {
@@ -80,8 +87,8 @@ simulated final function MoveToTop()
 }
 
 //Canvas clips and base positions must be preset!
-simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB);
-simulated function int DrawHint( Canvas Canvas, MonsterHUD MH);
+simulated function int DrawEvent( Canvas Canvas, float YStart, MHCR_ScoreBoard MB);
+simulated function int DrawHint( Canvas Canvas, MHCR_HUD MH);
 
 
 //*************************************************

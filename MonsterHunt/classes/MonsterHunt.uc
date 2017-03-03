@@ -11,6 +11,7 @@ var() config bool bReplaceUIWeapons;
 var() config int DamageToScore;
 var() config string HunterTeamName;
 var() config string HunterTeamIcon;
+var() config string ClientExtensionClass;
 
 var bool bCountMonstersAgain; //Monster counting isn't immediate, helps other mutators properly affect monsters before we do it
 var bool bCheckEndLivesAgain;
@@ -44,21 +45,26 @@ event InitGame(string Options, out string Error)
 {
 	local Mutator M;
 	local Actor A;
+	local Texture T;
+	local class<MonsterBriefing> BriefingClass;
 	
 	//Force settings
 	bUseTranslocator = False; //Warning: TranslocDest points will be unlinked with this
 	bNoMonsters = False;
 	MaxAllowedTeams = 1;
 
-	if ( int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 19 )
+	BriefingClass = class<MonsterBriefing>( DynamicLoadObject(ClientExtensionClass,class'class') );
+	if ( BriefingClass == None )
 	{
-		ReplaceFunction( class'MonsterBoard', class'MonsterBoard', 'GetCycles', 'GetCycles_XC');
+		Error = "Failed to load client extension "$ClientExtensionClass$", check MonsterHunt.ini";
+		return;
+	}
+	
+	if ( int(ConsoleCommand("GET INI:ENGINE.ENGINE.GAMEENGINE XC_VERSION")) >= 19 )
+	{
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'TaskMonstersVsBot', 'TaskMonstersVsBot_XC');
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountMonsters', 'CountMonsters_XC');
 		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountHunters', 'CountHunters_XC');
-		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'FindIpToCountry', 'FindIpToCountry_XC');
-		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'BroadcastMessage', 'BroadcastMessage_XC');
-		ReplaceFunction( class'MHE_MonsterSpawner', class'MHE_MonsterSpawner', 'CountPawns', 'CountPawns_XC');
 	}
 	
 	Super.InitGame( Options, Error);
@@ -71,30 +77,17 @@ event InitGame(string Options, out string Error)
 			break;
 		}
 
-	Briefing = Spawn( Class'MonsterBriefing');
-		
-	bCountMonstersAgain = true;
-}
-
-function InitGameReplicationInfo()
-{
-	local Texture T;
-	
-	Super.InitGameReplicationInfo();
-
-	if ( MonsterReplicationInfo(GameReplicationInfo) == None )
-		return;
-
-	//Initialize hunter icon, make sure it is relevant
+	Briefing = Spawn( BriefingClass);
 	T = Texture( DynamicLoadObject(HunterTeamIcon,class'Texture') );
 	if ( T != None )
 	{
-		MonsterReplicationInfo(GameReplicationInfo).HuntersIcon = T;
+		Briefing.HuntersIcon = T;
 		if ( (Level.NetMode != NM_Standalone) && (int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 11) )
 			AddToPackageMap( Left(HunterTeamIcon, InStr(HunterTeamIcon,".")) );
 	}
+	
+	bCountMonstersAgain = true;
 }
-
 
 event PostLogin( PlayerPawn NewPlayer )
 {
@@ -321,16 +314,14 @@ function ScoreKill( Pawn Killer, Pawn Other)
 	local bool bSpecialScore;
 	local ScriptedPawn S;
 	local MonsterPlayerData MPD;
-	local MonsterReplicationInfo MRI;
 	local float ScoreStart;
 
 	bCountMonstersAgain = true;
 	S = ScriptedPawn(Other);
-	MRI = MonsterReplicationInfo(GameReplicationInfo);
-	if ( (S != None) && S.bIsBoss && (MRI != None) )
+	if ( (S != None) && S.bIsBoss && (Briefing != None) )
 	{
-		MRI.KilledBosses++;
-		MRI.BossCount--;
+		Briefing.KilledBosses++;
+		Briefing.BossCount--;
 	}
 	if ( (Killer != None) && Killer.bIsPlayer && (Killer.PlayerReplicationInfo != None) && (S != None) )
 	{
@@ -352,8 +343,11 @@ function ScoreKill( Pawn Killer, Pawn Other)
 		if ( !bSpecialScore )
 			Killer.PlayerReplicationInfo.Score += Sqrt( float(Other.default.Health) * 0.01 );
 
-		if ( MRI != None ) MPD = MRI.GetPlayerData( Killer.PlayerReplicationInfo.PlayerID);
-		if ( MRI != None ) MRI.KilledMonsters++;
+		if ( Briefing != None )
+		{
+			Briefing.KilledMonsters++;
+			MPD = Briefing.GetPlayerData( Killer.PlayerReplicationInfo.PlayerID);
+		}
 		if ( MPD != None ) MPD.MonsterKills++;
 		if ( S.bIsBoss )
 		{
@@ -749,17 +743,16 @@ function CountMonsters()
 		if ( P.IsA('ScriptedPawn') && (P.Health > 0) )
 		{
 			i++; //Ignore friendly monsters?
-			MonstersPerZone[P.Region.ZoneNumber] += int(P.AttitudeToPlayer != ATTITUDE_Friendly);
+			MonstersPerZone[P.Region.ZoneNumber] += int(P.AttitudeToPlayer < ATTITUDE_Friendly);
 			if ( ScriptedPawn(P).bIsBoss )
 				iB++;
 			if ( P.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
 				P.Shadow = Spawn( Class'MonsterShadow', P);
 		}
 	if ( MonsterReplicationInfo(GameReplicationInfo) != None )
-	{
 		MonsterReplicationInfo(GameReplicationInfo).Monsters = i;
-		MonsterReplicationInfo(GameReplicationInfo).BossCount = iB;
-	}
+	if ( Briefing != None )
+		Briefing.BossCount = iB;
 }
 
 function CountMonsters_XC()
@@ -773,7 +766,7 @@ function CountMonsters_XC()
 		if ( S.Health > 0 )
 		{
 			i++; //Ignore friendly monsters?
-			MonstersPerZone[S.Region.ZoneNumber] += int(S.AttitudeToPlayer != ATTITUDE_Friendly);
+			MonstersPerZone[S.Region.ZoneNumber] += int(S.AttitudeToPlayer < ATTITUDE_Friendly);
 			if ( S.bIsBoss )
 				iB++;
 			if ( S.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
@@ -781,10 +774,9 @@ function CountMonsters_XC()
 		}
 	}
 	if ( MonsterReplicationInfo(GameReplicationInfo) != None )
-	{
 		MonsterReplicationInfo(GameReplicationInfo).Monsters = i;
-		MonsterReplicationInfo(GameReplicationInfo).BossCount = iB;
-	}
+	if ( Briefing != None )
+		Briefing.BossCount = iB;
 }
 
 //Hunter counter
@@ -849,7 +841,7 @@ function WaypointVisited( MonsterWaypoint Other, PlayerReplicationInfo Visitor)
 {
 	local MonsterPlayerData MPD;
 	
-	MPD = MonsterReplicationInfo(GameReplicationInfo).GetPlayerData( Visitor.PlayerID);
+	MPD = Briefing.GetPlayerData( Visitor.PlayerID);
 	if ( MPD != None )
 		MPD.ObjectivesTaken++;
 	UnregisterWaypoint( Other);
@@ -944,24 +936,16 @@ function CheckPlayerData( Pawn Other, int NewTeam)
 	local MonsterPlayerData MPD;
 	local MonsterAuthenticator MA;
 	
-	MPD = MonsterReplicationInfo(GameReplicationInfo).GetPlayerData( Other.PlayerReplicationInfo.PlayerID);
+	MPD = Briefing.GetPlayerData( Other.PlayerReplicationInfo.PlayerID);
 	if ( MPD != None )
 	{
 		MPD.TeamSkin = NewTeam;
 		return;
 	}
-	MA = GetAuthenticator(Other);
+	MA = Briefing.GetAuthenticator(Other);
 	MA.TeamSkin = NewTeam;
 }
 
-function MonsterAuthenticator GetAuthenticator( Pawn Other)
-{
-	local MonsterAuthenticator M;
-	For ( M=AuthenticatorList ; M!=None ; M=M.NextAuthenticator )
-		if ( M.Owner == Other )
-			return M;
-	return Spawn(class'MonsterAuthenticator', Other);
-}
 
 defaultproperties
 {
@@ -975,6 +959,7 @@ defaultproperties
 	DefaultWeapon=Class'Botpack.ChainSaw'
 	MapListType=Class'MonsterMapList'
 	RulesMenuType="MonsterHunt.MonsterHuntRules"
+	ClientExtensionClass="MonsterHuntCL_0.MHCL_MonsterBriefing"
 	ScoreBoardType=Class'MonsterBoard'
 	HUDType=Class'MonsterHUD'
 	GameReplicationInfoClass=Class'MonsterReplicationInfo'
@@ -992,6 +977,7 @@ defaultproperties
 	TimeOutMessage="Time up, hunt failed!"
 	SingleWaitingMessage="Press Fire to begin the hunt."
 
+	
 	MonsterKillType(0)=Nali
 	MonsterKillScore(0)=-6
 	MonsterKillType(1)=Cow

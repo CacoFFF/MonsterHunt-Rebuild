@@ -30,7 +30,7 @@ replication
 		MonstersLeft, CompletedAt, bSpawnFinished, bSpawnInterrupted, CountersLeft, NextCounterLowest;
 }
 
-simulated function int DrawEvent( Canvas Canvas, float YStart, MonsterBoard MB)
+simulated function int DrawEvent( Canvas Canvas, float YStart, MHCR_ScoreBoard MB)
 {
 	local float FY;
 	

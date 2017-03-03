@@ -66,10 +66,10 @@ function PostInit()
 	local ThingFactory TF;
 	local int CountersTotal;
 
-	if ( bFirstCounter && (MonsterHunt(Level.Game).Briefing != None) )
+	if ( bFirstCounter && (Briefing != None) )
 	{
 		CountersTotal = ActiveCounters();
-		For ( MHE=MonsterHunt(Level.Game).Briefing.MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
+		For ( MHE=Briefing.MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
 			if ( MHE.Tag == Tag )
 			{
 				if ( MHE.IsA('MHE_MonsterSpawner') && !bSpawnerContains )

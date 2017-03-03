@@ -62,7 +62,6 @@ final function bool IsTouching( Actor Other)
 	return VSize(Diff) < CollisionRadius+Other.CollisionRadius;
 }
 
-
 state FearSpot
 {
 	event BeginState()

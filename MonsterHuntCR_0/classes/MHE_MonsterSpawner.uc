@@ -49,7 +49,7 @@ function Discover()
 	bDiscovered = true;
 	if ( Interface == None )
 	{
-		MHI = Spawn( class'MHI_MonsterSpawner');
+		MHI = Spawn( class'MHI_MonsterSpawner', self);
 		Interface = MHI;
 		OriginalIndex = MHI.EventIndex;
 		MHI.MonsterName = Class<Pawn>(MarkedFactory.Prototype).default.MenuName;

@@ -1,0 +1,13 @@
+[MHCR_HUD]
+IdentifyArmor=Armor:
+
+[MHE_MonsterSpawner]
+TEXT_MonsterWave="Monster wave"
+TEXT_IndividualEvent="Event"
+TEXT_AllEvents="All events"
+TEXT_FirstEvent="First event"
+TEXT_NextEvent="Next event"
+TEXT_LastEvent="Last event"
+TEXT_Finished="finished"
+TEXT_Interrupted="interrupted"
+TEXT_Remaining="remaining"

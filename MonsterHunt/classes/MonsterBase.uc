@@ -154,7 +154,7 @@ function MutatorTakeDamage( out int ActualDamage, Pawn Victim, Pawn InstigatedBy
 	//Monster being damaged by player, add score if possible
 	if ( (Game.DamageToScore > 0) && (InstigatedBy != None) && (InstigatedBy.PlayerReplicationInfo != None) && (ScriptedPawn(Victim) != None) )
 	{
-		MPD = MonsterReplicationInfo(Game.GameReplicationInfo).GetPlayerData( InstigatedBy.PlayerReplicationInfo.PlayerID);
+		MPD = MonsterHunt(Level.Game).Briefing.GetPlayerData( InstigatedBy.PlayerReplicationInfo.PlayerID);
 		if ( MPD != None )
 		{
 			Res = (MPD.AccDamage += ActualDamage) / Game.DamageToScore;
