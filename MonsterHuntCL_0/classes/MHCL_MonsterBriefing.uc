@@ -11,6 +11,7 @@ simulated event PostBeginPlay()
 		Level.Game.HUDType = Class'MHCL_HUD';
 	}
 	Super.PostBeginPlay();
+	Spawn( class'MonsterBloodNotify');
 }
 
 function InitXCGE( int Version)
