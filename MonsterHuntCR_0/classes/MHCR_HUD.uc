@@ -610,7 +610,7 @@ simulated function DrawHints( Canvas Canvas)
 	InvMaxWidth = 1 / tan( PlayerOwner.FOVAngle * 0.008727); //Optimization
 	MidPoints.X = ClipX * 0.5;
 	MidPoints.Y = ClipY * 0.5;
-	NearestToMidCoords = MidPoints * 0.7;
+	NearestToMidCoords = MidPoints * 0.76;
 	Canvas.DrawColor = WhiteColor;
 	Canvas.Style = ERenderStyle.STY_Translucent;
 	
