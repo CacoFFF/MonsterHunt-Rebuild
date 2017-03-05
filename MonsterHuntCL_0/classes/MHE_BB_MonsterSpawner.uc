@@ -8,14 +8,31 @@ var int OriginalIndex;
 var string CreatureType;
 var class<ScriptedPawn> SP;
 var bool bLoopSpawner;
+var bool bWaveSpawner;
 var bool bCompleted;
 
 function bool RegisterSpawner( Actor Other)
 {
-	if ( Other.IsA('B_MonsterSpawner') && (SpawnerCount < ArrayCount(BoomSpawners)) && (Other.GetPropertyText("CreatureType") == CreatureType) )
+	local int i;
+	if ( SpawnerCount < ArrayCount(BoomSpawners) )
 	{
-		BoomSpawners[SpawnerCount++] = Other;
-		return true;
+		i = SpawnerCount;
+		if ( bWaveSpawner )
+		{
+			if ( Other.IsA('B_MonsterWaveSpawner') )
+				BoomSpawners[SpawnerCount++] = Other;
+		}
+		else if ( bLoopSpawner )
+		{
+			if ( Other.IsA('B_MonsterLoopSpawner') && (Other.GetPropertyText("CreatureType") == CreatureType) )
+				BoomSpawners[SpawnerCount++] = Other;
+		}
+		else
+		{
+			if ( Other.IsA('B_MonsterSpawner') )
+				BoomSpawners[SpawnerCount++] = Other;
+		}
+		return i != SpawnerCount;
 	}
 }
 
@@ -74,11 +91,22 @@ DOT:
 
 function CheckState()
 {
-	local int i, j;
+	local int i, j, k;
 	
 	CountedPawns = 0;
 	bCompleted = true;
-	if ( bLoopSpawner )
+	if ( bWaveSpawner ) //Can't access wave count!!
+	{
+		For ( i=0 ; i<SpawnerCount ; i++ )
+			if ( BoomSpawners[i] != None )
+			{
+				j = int( BoomSpawners[i].GetPropertyText("SpawnNum") );
+				bCompleted = bCompleted && (j==0);
+				CountedPawns += int( BoomSpawners[i].GetPropertyText("NumMonster") );
+			}
+	}
+	else if ( bLoopSpawner )
+	{
 		For ( i=0 ; i<SpawnerCount ; i++ )
 			if ( BoomSpawners[i] != None )
 			{
@@ -86,6 +114,15 @@ function CheckState()
 				bCompleted = bCompleted && (j==0);
 				CountedPawns += j + int( BoomSpawners[i].GetPropertyText("NumMonster") );
 			}
+	}
+	else
+	{
+		For ( i=0 ; i<SpawnerCount ; i++ )
+			if ( BoomSpawners[i] != None )
+				bCompleted = bCompleted && BoomSpawners[i].IsInState('Finished');
+		if ( bCompleted )
+			CountedPawns = CountPawns();
+	}
 
 	UpdateInterface();
 }
@@ -112,7 +149,7 @@ function UpdateInterface()
 			}*/
 		}
 	
-		if ( (MHI.CompletedAt == 0) && (CountedPawns <= 0) )
+		if ( (MHI.CompletedAt == 0) && (CountedPawns <= 0) && bCompleted )
 		{
 			MHI.CompletedAt = MHI.Briefing.CurrentTime;
 			MHI.bDormant = true;
@@ -127,3 +164,24 @@ function UpdateInterface()
 	}
 }
 
+function int CountPawns()
+{
+	local Actor S;
+	local int i;
+	
+	ForEach AllActors ( SP, S)
+		if ( S.Event == Tag )
+			i++;
+	return i;
+}
+
+function int CountPawns_XC()
+{
+	local Actor S;
+	local int i;
+	
+	ForEach DynamicActors ( SP, S)
+		if ( S.Event == Tag )
+			i++;
+	return i;
+}

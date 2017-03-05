@@ -2,7 +2,8 @@
 // Use this to customize MH proto's client interface
 class MHCL_MonsterBriefing expands MonsterBriefing;
 
-var class<Actor> BoomBoySpawnerBaseL;
+var class<Actor> BoomBoySpawnerBase;
+var bool bTrue;
 
 simulated event PostBeginPlay()
 {
@@ -18,6 +19,10 @@ simulated event PostBeginPlay()
 function InitXCGE( int Version)
 {
 	Super.InitXCGE( Version); //XC_Engine servers will auto-load this package on ServerPackages (implicitly)
+	if ( Version >= 19 )
+	{
+		ReplaceFunction( class'MHE_BB_MonsterSpawner', class'MHE_BB_MonsterSpawner', 'CountPawns', 'CountPawns_XC');
+	}
 }
 
 function MonsterAuthenticator SpawnAuthenticator( Pawn Other)
@@ -38,26 +43,62 @@ state Server
 	{
 		local Actor A, B;
 		local MHE_BB_MonsterSpawner CurSpawner;
-		
-		//Do not load the class, simply obtain it from memory if possible
-		SetPropertyText("BoomBoySpawnerBaseL", "BBoyShare.B_MonsterLoopSpawner");
-		if ( BoomBoySpawnerBaseL != None )
+		local class<Actor> BBSB;
+	
+		bTrue = true;
+
+		SetPropertyText("BoomBoySpawnerBase", "BBoyShare.B_MonsterSpawner");
+		if ( BoomBoySpawnerBase != None )
 		{
-			ForEach AllActors( BoomBoySpawnerBaseL, A)
-				if ( A.Target != self && A.Class == BoomBoySpawnerBaseL )
+			BBSB = BoomBoySpawnerBase;
+			ForEach AllActors( BoomBoySpawnerBase, A)
+				if ( A.Target != self && A.Class == BoomBoySpawnerBase && A.GetPropertyText("bSpawnOnceOnly")==GetPropertyText("bTrue") )
+				{
+					CurSpawner = Spawn( class'MHE_BB_MonsterSpawner', self, A.Tag);
+					CurSpawner.CreatureType = A.GetPropertyText("CreatureType");
+					ForEach AllActors( BoomBoySpawnerBase, B, A.Tag)
+						if ( B.GetPropertyText("bSpawnOnceOnly")==GetPropertyText("bTrue") && CurSpawner.RegisterSpawner(B) )
+							B.Target = self;
+					CurSpawner.SetTimer( Level.TimeDilation+FRand(), true);
+				}
+		}
+		
+		SetPropertyText("BoomBoySpawnerBase", "BBoyShare.B_MonsterLoopSpawner");
+		if ( BoomBoySpawnerBase != None )
+		{
+			ForEach AllActors( BoomBoySpawnerBase, A)
+				if ( A.Target != self && A.Class == BoomBoySpawnerBase )
 				{
 					CurSpawner = Spawn( class'MHE_BB_MonsterSpawner', self, A.Tag);
 					CurSpawner.CreatureType = A.GetPropertyText("CreatureType");
 					CurSpawner.bLoopSpawner = true;
-					ForEach AllActors( BoomBoySpawnerBaseL, B, A.Tag)
+					ForEach AllActors( BoomBoySpawnerBase, B, A.Tag)
 						if ( CurSpawner.RegisterSpawner(B) )
 							B.Target = self;
 					CurSpawner.SetTimer( Level.TimeDilation+FRand(), true);
 				}
-			
-			ForEach AllActors( BoomBoySpawnerBaseL, A)
-				A.Target = None;
 		}
+		
+		SetPropertyText("BoomBoySpawnerBase", "BBoyShare.B_MonsterWaveSpawner");
+		if ( BoomBoySpawnerBase != None )
+		{
+			ForEach AllActors( BoomBoySpawnerBase, A)
+				if ( A.Target != self && A.Class == BoomBoySpawnerBase )
+				{
+					CurSpawner = Spawn( class'MHE_BB_MonsterSpawner', self, A.Tag);
+					CurSpawner.bLoopSpawner = true;
+					CurSpawner.bWaveSpawner = true;
+					ForEach AllActors( BoomBoySpawnerBase, B, A.Tag)
+						if ( CurSpawner.RegisterSpawner(B) )
+							B.Target = self;
+					CurSpawner.SetTimer( Level.TimeDilation+FRand(), true);
+				}
+		}
+
+		if ( BBSB != None )
+			ForEach AllActors( BBSB, A)
+				A.Target = None;
+		
 	}
 
 Begin:
