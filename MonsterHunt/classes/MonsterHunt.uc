@@ -683,12 +683,16 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		}
 
 		For ( E=EndList ; E!=None ; E=E.NextEnd )
+		{
+			if ( !E.bInitiallyActive && E.bReachedByPlayer )
+				continue;
 			if ( (E.DeferTo != None && AttractTo( aBot, E.DeferTo, true)) || (E.DeferTo == None && AttractTo( aBot, E)) )
 			{
 				NewDest = aBot.MoveTarget;
 				if ( E.bCollideActors && E.bInitiallyActive ) //Prioritize 
 					Goto ATTRACT_DEST;
 			}
+		}
 
 		if ( NewDest != None )
 			Goto ATTRACT_DEST;

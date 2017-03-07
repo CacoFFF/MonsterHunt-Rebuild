@@ -7,6 +7,7 @@ class MonsterEnd expands Trigger;
 
 var MonsterEnd NextEnd;
 var NavigationPoint DeferTo;
+var bool bReachedByPlayer;
 
 function PostBeginPlay()
 {
@@ -19,6 +20,9 @@ function PostBeginPlay()
 function Touch( Actor Other)
 {
 	local Actor A;
+
+	if ( !bReachedByPlayer && (Pawn(Other) != None) && (Pawn(Other).PlayerReplicationInfo != None) )
+		bReachedByPlayer = true;
 
 	if ( !IsRelevant(Other) )
 		return;
