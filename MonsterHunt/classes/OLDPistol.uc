@@ -6,16 +6,16 @@ class OLDPistol extends UIweapons;
 var travel int PowerLevel;
 var vector WeaponPos;
 var float Count,ChargeSize;
-var ChargeLight cl1,cl2;
 var Pickup Amp;
 var Sound PowerUpSound;
 var name ShootAnims[5];
+var bool bDeathMatch;
 var class<DispersionAmmo> DProjectiles[5];
 
 replication
 {
 	reliable if ( bNetOwner && Role==ROLE_Authority )
-		PowerLevel;
+		PowerLevel, bDeathMatch;
 	reliable if ( Role==ROLE_Authority )
 		ClientPowerup;
 }
@@ -96,7 +96,7 @@ simulated function PlayFiring()
 	local int pl;
 	
 	AmmoType.GoToState('Idle2');
-	Owner.PlaySound(AltFireSound, SLOT_None, 1.8*Pawn(Owner).SoundDampening,,,1.2);
+	Owner.PlayOwnedSound(AltFireSound, SLOT_None, 1.8*Pawn(Owner).SoundDampening,,,1.2);
 	if ( PlayerPawn(Owner) != None )
 		PlayerPawn(Owner).ShakeView(ShakeTime, ShakeMag, ShakeVert);	
 	pl = Min(PowerLevel,4);
@@ -145,8 +145,8 @@ function Projectile ProjectileFire(class<projectile> ProjClass, float ProjSpeed,
 
 	if ( AmmoType.AmmoAmount >= 10 )
 		pl = Min(PowerLevel,4);
-	else if ( AmmoType.AmmoAmount <= 1 )
-		AmmoType.AmmoAmount = 2;
+	else if ( AmmoType.AmmoAmount < int(bDeathMatch) )
+		AmmoType.AmmoAmount = int(bDeathMatch);
 	if ( AmmoType.UseAmmo(pl) )
 		da = Spawn( DProjectiles[pl],,, Start, AdjustedAim);
 	if ( (da != None) && (Mult>1.0) )
@@ -178,6 +178,15 @@ simulated state ClientAltFiring
 		PlayerViewOffset.Z = WeaponPos.Z + FRand()*ChargeSize*7;
 
 		ChargeSize += DeltaTime;
+		//Simulate ammo drain
+		Count += DeltaTime;
+		if ( Count > 0.3 )
+		{
+			Count -= 0.3;
+			if ( AmmoType != None )
+				AmmoType.AmmoAmount--;
+		}
+		
 		
 		if ( Pawn(Owner).bAltFire == 0 || (ChargeSize >= 2.0 + 0.6 * PowerLevel) || (AmmoType != None && AmmoType.AmmoAmount <= 1) )
 		{
@@ -199,6 +208,7 @@ simulated state ClientAltFiring
 		PlayIdleAnim();
 		WeaponPos = PlayerviewOffset;	
 		ChargeSize=0.0;
+		Count=0.0;
 		Owner.Playsound(Misc1Sound,SLOT_Misc, Pawn(Owner).SoundDampening*4.0);
 	}
 }
@@ -211,46 +221,43 @@ ignores AltFire, AnimEnd;
 
 	function Tick( float DeltaTime )
 	{
-		if ( Level.NetMode == NM_StandAlone )
+		if ( (PlayerPawn(Owner) != None) && (ViewPort(PlayerPawn(Owner).Player) != None) )
 		{
 			PlayerViewOffset.X = WeaponPos.X + FRand()*ChargeSize*7;
 			PlayerViewOffset.Y = WeaponPos.Y + FRand()*ChargeSize*7;
 			PlayerViewOffset.Z = WeaponPos.Z + FRand()*ChargeSize*7;
 		}	
 		ChargeSize += DeltaTime;
-		if( (pawn(Owner).bAltFire==0)) GoToState('ShootLoad');
+		if ( pawn(Owner).bAltFire==0 || (ChargeSize >= 2.0 + 0.6 * PowerLevel) )
+		{
+			GoToState('ShootLoad');
+			return;
+		}
 		Count += DeltaTime;
-		if (Count > 0.3) 
+		if ( Count > 0.3 ) 
 		{
 			Count -= 0.3; //Higor: tickrate independant charge
-			If (!AmmoType.UseAmmo(1)) GoToState('ShootLoad');
-			AmmoType.GoToState('Idle2');
+			If ( !AmmoType.UseAmmo(1) || (AmmoType.AmmoAmount <= int(bDeathMatch) ) )
+				GoToState('ShootLoad');
 		}
 	}
 	
-	Function EndState()
+	function EndState()
 	{
+		AmmoType.GoToState('Idle2');
 		PlayerviewOffset = WeaponPos;
-		if (cl1!=None) cl1.Destroy();
-		if (cl2!=None) cl2.Destroy();		
+		if ( (AmmoType.AmmoAmount < int(bDeathMatch) ) )
+			AmmoType.AmmoAmount = int(bDeathMatch);
 	}
 
 	function BeginState()
 	{
 		WeaponPos = PlayerviewOffset;	
 		ChargeSize=0.0;		
+		Count = 0.3;
 	}
-
 Begin:
-	if (AmmoType.UseAmmo(1))
-	{
-		Owner.Playsound(Misc1Sound,SLOT_Misc, Pawn(Owner).SoundDampening*4.0);
-		Count = 0.0;		
-		Sleep(2.0 + 0.6 * PowerLevel);
-		GoToState('ShootLoad');
-	}
-	else
-		GotoState('Idle');
+	Stop;
 }
 
 		
@@ -270,7 +277,7 @@ ignores fire, altfire;
 		else
 			Mult=1.0;
 		
-		Owner.PlaySound(AltFireSound, SLOT_Misc, 1.8*Pawn(Owner).SoundDampening);
+		Owner.PlayOwnedSound(AltFireSound, SLOT_Misc, 1.8*Pawn(Owner).SoundDampening);
 		if ( PlayerPawn(Owner) != None )
 			PlayerPawn(Owner).ShakeView(ShakeTime, ShakeMag*ChargeSize, ShakeVert);
 		PlayAnim( ShootAnims[Min(PowerLevel,4)], 0.2, 0.05); //Port to client
@@ -294,14 +301,15 @@ Begin:
 ///////////////////////////////////////////////////////
 simulated function ClientPowerup( int NewPowerLevel, Sound NewPowerupSound)
 {
+	if ( Level.NetMode != NM_Client )
+		return;
 	Owner.PlayOwnedSound( NewPowerupSound, SLOT_None, Pawn(Owner).SoundDampening);				
 	if (NewPowerLevel==1)		PlayAnim('PowerUp1',0.1, 0.05);	
 	else if (NewPowerLevel==2)	PlayAnim('PowerUp2',0.1, 0.05);			
 	else if (NewPowerLevel==3)	PlayAnim('PowerUp3',0.1, 0.05);					
 	else						PlayAnim('PowerUp4',0.1, 0.05);
-	//Apply ping correction to animation later
-	if ( Level.NetMode == NM_Client )
-		GotoState('ClientFiring');
+	//Apply ping correction to animation later (?)
+	GotoState('ClientFiring');
 }
 
 state PowerUp
@@ -372,6 +380,8 @@ simulated function TweenSelect()
 
 simulated function PlaySelect()
 {
+	if ( Level.Game != None)  
+		bDeathMatch = Level.Game.bDeathMatch;
 	Owner.PlaySound(SelectSound, SLOT_None, Pawn(Owner).SoundDampening);
 	if (PowerLevel==0) PlayAnim('Select1',0.5,0.0);
 	else if (PowerLevel==1) PlayAnim('Select2',0.5,0.0);
