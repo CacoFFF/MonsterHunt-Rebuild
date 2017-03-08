@@ -12,6 +12,7 @@ event PostBeginPlay()
 {
 	local Triggers T, PrevT;
 	local NavigationPoint N;
+	local Mover M;
 	
 	SetCollisionSize( 38, 17);
 	
@@ -37,6 +38,12 @@ event PostBeginPlay()
 			ExtraCost = 10000000;
 		else if ( MarkedTrigger.IsA('Kicker') ) //Makes bots go around this path if not attempting to go through the kicker
 			ExtraCost = 400;
+		else if ( MarkedTrigger.IsA('Trigger') )
+		{
+			if ( ((Trigger(MarkedTrigger).InitialState == 'OtherTriggerTurnsOn') || (Trigger(MarkedTrigger).InitialState == 'OtherTriggerToggles')) 
+				&& (MarkedTrigger.Event != '') && HasTriggeredDoor(MarkedTrigger.Event) )
+				InitialState = 'DoorControl';
+		}
 	}
 	
 	if ( MonsterHunt(Level.Game) != None )
@@ -52,16 +59,6 @@ event PostBeginPlay()
 	}
 }
 
-final function bool IsTouching( Actor Other)
-{
-	local vector Diff;
-	Diff = Other.Location - Location;
-	if ( Abs(Diff.Z) > CollisionHeight+Other.CollisionHeight )
-		return false;
-	Diff.Z = 0;
-	return VSize(Diff) < CollisionRadius+Other.CollisionRadius;
-}
-
 state FearSpot
 {
 	event BeginState()
@@ -74,6 +71,48 @@ state FearSpot
 		if ( (FearSpot(MarkedTrigger) != None) && FearSpot(MarkedTrigger).bInitiallyActive )
 			return 10000000;
 		return 0;
+	}
+}
+
+state DoorControl
+{
+	event BeginState()
+	{
+		bSpecialCost = true;
+	}
+
+	event int SpecialCost( pawn Seeker)
+	{
+		if ( Trigger(MarkedTrigger) != None && !Trigger(MarkedTrigger).bInitiallyActive )
+			return 10000000;
+		return 0;
+	}
+}
+
+
+final function bool IsTouching( Actor Other)
+{
+	local vector Diff;
+	Diff = Other.Location - Location;
+	if ( Abs(Diff.Z) > CollisionHeight+Other.CollisionHeight )
+		return false;
+	Diff.Z = 0;
+	return VSize(Diff) < CollisionRadius+Other.CollisionRadius;
+}
+
+function bool HasTriggeredDoor( name DoorTag)
+{
+	local Actor S, E, A;
+	local int rF, rD, i, iR;
+	local vector HL, HN;
+	
+	For ( i=0 ; (i<16) && (Paths[i]>=0) ; i++ )
+	{
+		describeSpec( Paths[i], A, E, rF, rD);
+		A = None;
+		ForEach TraceActors( class'Actor', A, HL, HN, E.Location)
+			if ( (A.Tag == DoorTag) && A.IsA('Mover') )
+				return true;
 	}
 }
 
