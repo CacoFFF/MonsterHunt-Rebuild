@@ -29,11 +29,12 @@ var() localized string MonthString[13];
 var() localized string DayString[7];
 
 
-function Destroyed()
+event Destroyed()
 {
+	//Level about to be purged, no need for additional processing
+	if ( (Level.NetMode == NM_Client) && (Owner != None) && Owner.bDeleteMe )
+		return;
 	Super.Destroyed();
-	if ( MyFonts != None )
-		MyFonts.Destroy();
 }
 
 

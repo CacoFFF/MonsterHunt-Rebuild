@@ -6,6 +6,7 @@ var bool bFirstCounter;
 var bool bSpawnerContains;
 var bool bSpawnerCompletes;
 
+
 function RegisterCounter( Counter NewCounter)
 {
 	local MHE_Base MHE;
@@ -26,10 +27,45 @@ function RegisterCounter( Counter NewCounter)
 		}
 }
 
+function bool CausesEvent( name aEvent)
+{
+	return !bCompleted && (MarkedCounter != None) && (MarkedCounter.Event == aEvent);
+}
+
+//Get rid of this Event
 event Trigger( Actor Other, Pawn EventInstigator)
 {
 	if ( !bDiscovered )
 		Discover();
+	bCompleted = MarkedCounter == None || MarkedCounter.bDeleteMe || MarkedCounter.NumToCount == 0;
+	if ( bCompleted )
+		Destroy();
+}
+
+event Destroyed()
+{
+	local MHE_Base MHE;
+	
+	if ( bFirstCounter )
+	{
+		if ( NextSameTag != None )
+			NextSameTag.bFirstCounter = true;
+		if ( bSpawnerContains )
+			For ( MHE=Briefing.MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
+				if ( MHE.IsA('MHE_MonsterSpawner') )
+					MHE_MonsterSpawner(MHE).Counter = NextSameTag;
+	}
+	else
+	{
+		For ( MHE=Briefing.MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
+			if ( MHE.IsA('MHE_Counter') && (MHE_Counter(MHE).NextSameTag == self) )
+			{
+				MHE_Counter(MHE).NextSameTag = NextSameTag;
+				break;
+			}
+	}
+	
+	Super.Destroyed();
 }
 
 function byte GetLowestCounter()

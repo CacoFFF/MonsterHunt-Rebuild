@@ -12,7 +12,6 @@ event PostBeginPlay()
 {
 	local Triggers T, PrevT;
 	local NavigationPoint N;
-	local Mover M;
 	
 	SetCollisionSize( 38, 17);
 	

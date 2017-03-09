@@ -87,6 +87,11 @@ function UpdateInterface()
 				MHI.CountersLeft = Counter.ActiveCounters();
 				MHI.NextCounterLowest = Counter.GetLowestCounter();
 			}
+			else
+			{
+				MHI.CountersLeft = 0;
+				MHI.NextCounterLowest = 0;
+			}
 		}
 		
 		if ( bInterrupted && (MHI.EventIndex != OriginalIndex) )

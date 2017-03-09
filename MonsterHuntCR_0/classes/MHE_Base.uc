@@ -13,12 +13,13 @@ var NavigationPoint DeferTo;
 var bool bDiscovered;
 var bool bCompleted;
 var bool bPostInit;
+var bool bAttractBots;
 
 var enum EDeferToMode
 {
 	DTM_None,
-	DTM_Nearest,
 	DTM_InCollision,
+	DTM_Nearest,
 	DTM_NearestVisible
 } DeferToMode;
 
@@ -34,21 +35,24 @@ function PostInit()
 	bPostInit = true;
 }
 
-function FindDeferPoint()
+function bool CausesEvent( name aEvent);
+
+function FindDeferPoint( Actor DeferFor)
 {
 	local NavigationPoint N, Best;
-	local float ScanRange;
-	local vector V;
+	local float Weight, BestWeight;
+	local vector V, HN;
+	local Actor A;
 	
 	if ( DeferToMode == DTM_None )
 		return;
-	else if ( DeferToMode == DTM_InCollision )
+	if ( DeferToMode == DTM_InCollision )
 	{
 		V.X = CollisionRadius + 17;
 		V.Z = CollisionHeight + 39;
-		ScanRange = VSize(V);
-		ForEach RadiusActors( class'NavigationPoint', N, ScanRange)
-			if ( MHS.static.ActorsTouching(self,N) )
+		Weight = VSize(V);
+		ForEach RadiusActors( class'NavigationPoint', N, Weight)
+			if ( MHS.static.ActorsTouching(self,N) && (N.UpstreamPaths[0] != -1) )
 			{
 				if ( N.IsA('MonsterTriggerMarker') )
 				{
@@ -58,8 +62,37 @@ function FindDeferPoint()
 				if ( (Best == None) || (Best.ExtraCost > N.ExtraCost) )
 					Best = N;
 			}
-		DeferTo = Best;
+		if ( Best == None )
+			DeferToMode = DTM_NearestVisible;
 	}
+	if ( DeferToMode == DTM_NearestVisible )
+	{
+		ForEach RadiusActors( class'NavigationPoint', N, 1500)
+		{
+			Weight = 1000 + 500*int(N.IsA('MonsterTriggerMarker')) - VSize( (N.Location - Location) * vect(1,1,3) );
+			if ( Weight > BestWeight )
+			{	//Make sure trace reaches this actor or DeferFor
+				ForEach TraceActors( class'Actor', A, V, HN, Location, N.Location)
+				{
+					if ( A == self || A == DeferFor )
+						break;
+					if ( A == Level )
+					{
+						if ( !MHS.static.InCylinder( V-Location, CollisionRadius, CollisionHeight) )
+							N = None;
+						break;
+					}
+				}
+				if ( N != None )
+				{
+					Best = N;
+					BestWeight = Weight;
+				}
+			}
+		}
+	}
+	
+	DeferTo = Best;
 }
 
 

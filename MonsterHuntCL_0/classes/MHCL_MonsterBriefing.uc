@@ -39,6 +39,12 @@ function MonsterPlayerData SpawnPlayerData( PlayerReplicationInfo aPRI)
 //Extension of base MonsterBriefing Server state
 state Server
 {
+	function GenerateSpawners()
+	{
+		Super.GenerateSpawners();
+		GenerateBoomBoySpawners();
+	}
+
 	function GenerateBoomBoySpawners()
 	{
 		local Actor A, B;
@@ -100,20 +106,4 @@ state Server
 				A.Target = None;
 		
 	}
-
-Begin:
-	Sleep( 0.01);
-	Level.Game.KillCredit( self); //Generic communication with MonsterHunt
-	GenerateCriticalEvents();
-	Sleep( 0.01);
-	GenerateSpawners();
-	Sleep( 0.01);
-	GenerateBoomBoySpawners();
-	Sleep( 0.01);
-	GenerateTranslatorEvents();
-	Sleep( 0.01);
-	GenerateCounters();
-	
-	While ( !PostInit() )
-		Sleep( 0.01);
 }
