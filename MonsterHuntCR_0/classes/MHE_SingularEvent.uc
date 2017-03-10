@@ -24,6 +24,7 @@ var(Debug) string EventChain;
 function RegisterMechanism( Actor Other)
 {
 	MarkedMechanism = Other;
+	SetLocation( Other.Location);
 	SetTimer( 1 + FRand() * 0.2, true);
 	if ( Other.IsA('Trigger') )
 		GotoState('TriggerState');
@@ -38,6 +39,7 @@ state TriggerState
 	event BeginState()
 	{
 		AnalyzeEvent( MarkedMechanism.Event);
+		SetCollisionSize( MarkedMechanism.CollisionRadius, MarkedMechanism.CollisionHeight);
 		FindDeferPoint( MarkedMechanism);
 		SetAttraction();
 	}
@@ -57,6 +59,9 @@ state ButtonState
 	event BeginState()
 	{
 		local Mover M;
+		local Actor A;
+		local vector HL, HN;
+
 		M = Mover(MarkedMechanism);
 		AnalyzeEvent( M.Event);
 		AnalyzeEvent( M.BumpEvent);
@@ -64,6 +69,21 @@ state ButtonState
 		Tag = M.Event;
 		SetCollisionSize( 0, 0);
 		FindDeferPoint( MarkedMechanism);
+		//This MHE should be inside the world!
+		//Also, carefully adjust position of target
+		if ( DeferTo != None )	
+		{
+			ForEach TraceActors( class'Actor', A, HL, HN, Location, DeferTo.Location)
+				if ( (A==MarkedMechanism) || (A==Level) )
+				{
+					SetLocation( HL);
+					break;
+				}
+			SetLocation( Location + Normal(DeferTo.Location-Location) * vect(1,1,2) );
+			if ( FastTrace( Location - vect(0,0,30)) )
+				SetLocation( Location - vect(0,0,10) );
+			SetCollisionSize( 10, 30);
+		}
 		SetAttraction();
 	}
 	function SetAttraction()
@@ -169,7 +189,7 @@ event Timer()
 	SetAttraction();
 	if ( !bDiscovered  )
 	{
-		SetLocation( MarkedMechanism.Location);
+//		SetLocation( MarkedMechanism.Location);
 		Vec.X = MarkedMechanism.CollisionRadius;
 		Vec.Y = MarkedMechanism.CollisionHeight;
 		Vec.Z = 200;
