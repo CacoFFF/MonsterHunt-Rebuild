@@ -9,7 +9,7 @@
 class MonsterBriefing expands Info;
 
 var MHI_Base InterfaceEventList, HintList;
-var MHE_Base MapEventList, TempEvent;
+var MHE_Base MapEventList, TempEvent; //TempEvent is used during initialization and pathfinding
 var MonsterPlayerData DataHash[32];
 var MonsterPlayerData InactiveDatas;
 var MonsterAuthenticator AuthenticatorList;
@@ -160,6 +160,20 @@ state Server
 			Spawn( class'MHE_Counter', self).RegisterCounter( C);
 	}
 	
+	function GenerateButtons()
+	{
+		local Trigger T;
+		local Mover M;
+
+		ForEach AllActors( class'Trigger', T)
+			if ( (T.Class == class'Trigger') && T.bTriggerOnceOnly )
+				Spawn( class'MHE_SingularEvent', self).RegisterMechanism( T);
+				
+		ForEach AllActors( class'Mover', M)
+			if ( (M.InitialState == 'BumpOpenTimed' || M.InitialState == 'BumpButton') && (M.bTriggerOnceOnly || M.StayOpenTime > 9999) )
+				Spawn( class'MHE_SingularEvent', self).RegisterMechanism( M);
+	}
+	
 	//Post-Init events one by one, if all are inited in a single row, stop
 	function bool PostInit()
 	{
@@ -170,6 +184,7 @@ state Server
 			For ( TempEvent=MapEventList ; TempEvent!=None ; TempEvent=TempEvent.NextEvent )
 				if ( !TempEvent.bPostInit )
 					Goto INIT_EVENT;
+			TempEvent = None;
 			return true;
 		}
 		
@@ -189,6 +204,8 @@ Begin:
 	GenerateTranslatorEvents();
 	Sleep( 0.01);
 	GenerateCounters();
+	Sleep( 0.01);
+	GenerateButtons();
 	
 	While ( !PostInit() )
 		Sleep( 0.01);
@@ -200,6 +217,50 @@ Begin:
 	Sleep( Level.TimeDilation+FRand() );
 	PlayerDataIntegrity();
 	Goto('Begin');
+}
+
+
+//********************************************************
+// Server events
+
+function MHE_Base GetNextBotAttractor()
+{
+	local MHE_Base Org;
+	local int Loop;
+
+	if ( TempEvent != None )
+		Org = TempEvent.NextEvent;
+
+	//This performs a round trip around the whole chained list
+	For ( Loop=0 ; Loop < 2 ; Org=MapEventList )
+		For ( Loop++ ; (Org != None) && (Org != TempEvent) ; Org=Org.NextEvent )
+			if ( Org.bAttractBots && !Org.bCompleted && (Org.DeferTo != None) )
+			{
+				if ( TempEvent != None && TempEvent == Org ) //We did a full round trip and failed to find another attractor!!
+					TempEvent = None;
+				else
+					TempEvent = Org;
+				return Org;
+			}
+	//Nothing was found
+	TempEvent = None;
+}
+
+function RemoveEvent( MHE_Base MEvent)
+{
+	local MHE_Base MHE;
+	if ( MapEventList == MEvent )
+		MapEventList = MEvent.NextEvent;
+	else
+	{
+		For ( MHE=MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
+			if ( MHE.NextEvent == MEvent )
+			{
+				MHE.NextEvent = MEvent.NextEvent;
+				break;
+			}
+	}
+	MEvent.NextEvent = None;
 }
 
 
@@ -323,22 +384,6 @@ simulated function RemoveHint( MHI_Base Hint)
 	Hint.NextHint = None;
 }
 
-function RemoveEvent( MHE_Base MEvent)
-{
-	local MHE_Base MHE;
-	if ( MapEventList == MEvent )
-		MapEventList = MEvent.NextEvent;
-	else
-	{
-		For ( MHE=MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
-			if ( MHE.NextEvent == MEvent )
-			{
-				MHE.NextEvent = MEvent.NextEvent;
-				break;
-			}
-	}
-	MEvent.NextEvent = None;
-}
 
 
 //********************************************************

@@ -565,6 +565,7 @@ function bool AttractTo( Pawn Other, Actor Dest, optional bool bNoSearch)
 function bool FindSpecialAttractionFor( Bot aBot)
 {
 	local MonsterWaypoint W, BestW;
+	local MHE_Base MHE;
 	local float ChanceW;
 	local MonsterEnd E;
 	local Actor NewDest;
@@ -608,7 +609,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		if ( BotState < 1.5 ) 
 			return False;
 			
-			
+
 		//8-12 seconds prioritizing monsters (if MonsterLimit is too low the bot bounces back and forth!!)
 		MonsterLimit = 4
 		+ int(ScriptedPawn(aBot.OrderObject) != None) * 2
@@ -631,6 +632,25 @@ function bool FindSpecialAttractionFor( Bot aBot)
 			}
 			else if ( Enemy == ReachableEnemy )
 				ReachableEnemy = None;
+		}
+		
+		//Additional objective!
+		MHE = MHE_Base(aBot.OrderObject);
+		if ( MHE != None )
+		{
+			if ( MHE.bDeleteMe || !MHE.bAttractBots || MHE.bCompleted || (MHE.DeferTo == None) )
+				aBot.OrderObject = None;
+			else
+			{
+				if ( !MHE.ShouldDefer(aBot) )
+				{
+					//Add case of MHE requiring shoot
+					aBot.MoveTarget = MHE;
+					Goto ATTRACT_DEST;
+				}
+				if ( AttractTo( aBot, MHE.DeferTo, true) )
+					Goto ATTRACT_DEST;
+			}
 		}
 		
 		//Otherwise prioritize the main objectives (sorted by priority)
@@ -711,6 +731,14 @@ function bool FindSpecialAttractionFor( Bot aBot)
 				ReachableEnemy = None;
 		}
 		bQueryEnemies = (FRand() < 0.01) || (ReachableEnemy == None);
+		
+		//Defer to a MHE_Event objective if failed to find anything else
+		MHE = Briefing.GetNextBotAttractor();
+		if ( (MHE != None) && AttractTo( aBot, MHE.DeferTo, true) )
+		{
+			aBot.OrderObject = MHE;
+			Goto ATTRACT_DEST;
+		}
 	}
 	return False;
 ATTRACT_DEST:

@@ -5,17 +5,17 @@ class MHE_Base expands Triggers;
 
 const MHS = class'MHCR_Statics';
 
-var MonsterBriefing Briefing;
-var MHE_Base NextEvent;
-var MHI_Base Interface;
-var NavigationPoint DeferTo;
+var(Debug) MonsterBriefing Briefing;
+var(Debug) MHE_Base NextEvent;
+var(Debug) MHI_Base Interface;
+var(Debug) NavigationPoint DeferTo;
 //Pointer to net breifing element!
-var bool bDiscovered;
-var bool bCompleted;
-var bool bPostInit;
-var bool bAttractBots;
+var(Debug) bool bDiscovered;
+var(Debug) bool bCompleted;
+var(Debug) bool bPostInit;
+var(Debug) bool bAttractBots;
 
-var enum EDeferToMode
+var(Debug) enum EDeferToMode
 {
 	DTM_None,
 	DTM_InCollision,
@@ -36,6 +36,20 @@ function PostInit()
 }
 
 function bool CausesEvent( name aEvent);
+
+
+function bool ShouldDefer( Pawn Other)
+{
+	if ( DeferTo != None )
+	{
+		if ( DeferToMode == DTM_InCollision ) //If path is touching this, defer
+			return true;
+		if ( DeferToMode >= DTM_Nearest ) //If path isn't touching, defer if not on the path
+		{
+			return !( MHS.static.ActorsTouching( Other, DeferTo, 20, 40) && Other.FastTrace(DeferTo.Location));
+		}
+	}
+}
 
 function FindDeferPoint( Actor DeferFor)
 {
@@ -70,7 +84,7 @@ function FindDeferPoint( Actor DeferFor)
 		ForEach RadiusActors( class'NavigationPoint', N, 1500)
 		{
 			Weight = 1000 + 500*int(N.IsA('MonsterTriggerMarker')) - VSize( (N.Location - Location) * vect(1,1,3) );
-			if ( Weight > BestWeight )
+			if ( (Weight > BestWeight) && (N.UpstreamPaths[0] != -1) )
 			{	//Make sure trace reaches this actor or DeferFor
 				ForEach TraceActors( class'Actor', A, V, HN, Location, N.Location)
 				{

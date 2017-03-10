@@ -25,6 +25,7 @@ replication
 function float RateSelf( out int bUseAltMode )
 {
 	local float rating;
+	local Pawn Enemy;
 
 	if ( Amp != None )
 		rating = 6 * AIRating;
@@ -33,14 +34,14 @@ function float RateSelf( out int bUseAltMode )
 
 	if ( AmmoType.AmmoAmount <=0 )
 		return 0.05;
-	if ( Pawn(Owner).Enemy == None )
-	{
+
+	Enemy = Pawn(Owner).Enemy;
+	if ( Enemy == None || (VSize(Enemy.Location - Owner.Location) < 100) || (Enemy.CollisionRadius > 70) || (AmmoType.AmmoAmount <= 3) )
 		bUseAltMode = 0;
-		return rating * (PowerLevel + 1);
-	}
-	
-	bUseAltMode = int( FRand() < 0.3 );
-	return rating * (PowerLevel + 1);
+	else //Smaller enemies are more likely to be targeted with alt-fire, higher power levels induce less chance of alt firing
+		bUseAltMode = int( FRand() < (0.35 - Enemy.CollisionHeight*0.002 - float(PowerLevel)*0.01)  );
+	//Less ammo alters the power level multiplier
+	return rating * (float(PowerLevel)*Sqrt(float(AmmoType.AmmoAmount)*0.02) + 1);
 }
 
 // return delta to combat style
