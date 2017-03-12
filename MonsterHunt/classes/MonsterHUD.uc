@@ -10,3 +10,9 @@ simulated function DrawStatus(Canvas Canvas)
 {
 	Super.DrawStatus( Canvas);
 }
+
+//UTJMH requires this function
+simulated event PostRender( Canvas Canvas)
+{
+	Super.PostRender( Canvas);
+}
