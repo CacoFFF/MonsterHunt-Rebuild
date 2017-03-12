@@ -13,6 +13,8 @@ var MHE_Base MapEventList, TempEvent; //TempEvent is used during initialization 
 var MonsterPlayerData DataHash[32];
 var MonsterPlayerData InactiveDatas;
 var MonsterAuthenticator AuthenticatorList;
+var FV_PathBlocker BlockerList;
+var int EventQueryTag;
 
 var int CurrentIndex;
 var int CurrentTime;
@@ -170,8 +172,11 @@ state Server
 				Spawn( class'MHE_SingularEvent', self).RegisterMechanism( T);
 				
 		ForEach AllActors( class'Mover', M)
-			if ( (M.InitialState == 'BumpOpenTimed' || M.InitialState == 'BumpButton') && (M.bTriggerOnceOnly || M.StayOpenTime > 9999) )
-				Spawn( class'MHE_SingularEvent', self).RegisterMechanism( M);
+			if ( (M.InitialState == 'BumpOpenTimed' || M.InitialState == 'BumpButton') )
+			{
+				if ( M.Event != '' || M.BumpEvent != '' || M.PlayerBumpEvent != '' )
+					Spawn( class'MHE_SingularEvent', self).RegisterMechanism( M);
+			}
 	}
 	
 	//Post-Init events one by one, if all are inited in a single row, stop
@@ -225,30 +230,47 @@ Begin:
 
 function MHE_Base GetNextBotAttractor()
 {
-	local MHE_Base Org;
 	local int Loop;
 
+	EventQueryTag++;
 	if ( TempEvent != None )
-		Org = TempEvent.NextEvent;
-
-	//This performs a round trip around the whole chained list
-	For ( Loop=0 ; Loop < 2 ; Org=MapEventList )
-		For ( Loop++ ; (Org != None) && (Org != TempEvent) ; Org=Org.NextEvent )
-			if ( Org.bAttractBots && !Org.bCompleted && (Org.DeferTo != None) )
-			{
-				if ( TempEvent != None && TempEvent == Org ) //We did a full round trip and failed to find another attractor!!
-					TempEvent = None;
-				else
-					TempEvent = Org;
-				return Org;
-			}
-	//Nothing was found
+	{
+		if ( TempEvent.bDeleteMe )
+			TempEvent = None;
+		else
+			TempEvent = TempEvent.NextEvent;
+	}
+	
+	//Perform a full round trip
+	while ( Loop++ <= 1 )
+	{
+		while ( (TempEvent != None) && (TempEvent.EventQueryTag != EventQueryTag) )
+		{
+			TempEvent.EventQueryTag = EventQueryTag;
+			if ( TempEvent.bAttractBots && !TempEvent.bCompleted && (TempEvent.DeferTo != None) )
+				return TempEvent;
+			TempEvent = TempEvent.NextEvent;
+		}
+		TempEvent = MapEventList;
+	}
 	TempEvent = None;
+}
+
+function MHE_Base FindNextTrigger( name aEvent, optional MHE_Base LastFound)
+{
+	local MHE_Base Link;
+	if ( LastFound != None )	Link = LastFound.NextEvent;
+	else						Link = MapEventList;
+	while ( (Link != None) && !Link.CausesEvent(aEvent) )
+		Link = Link.NextEvent;
+	return Link;
 }
 
 function RemoveEvent( MHE_Base MEvent)
 {
 	local MHE_Base MHE;
+	if ( TempEvent == MEvent )
+		TempEvent = MEvent.NextEvent;
 	if ( MapEventList == MEvent )
 		MapEventList = MEvent.NextEvent;
 	else
@@ -261,6 +283,20 @@ function RemoveEvent( MHE_Base MEvent)
 			}
 	}
 	MEvent.NextEvent = None;
+}
+
+
+//********************************************************
+// Triggered path blockers
+function FV_PathBlocker GetPathBlocker( name aTag)
+{
+	local FV_PathBlocker Result;
+
+	if ( BlockerList != None )
+		Result = BlockerList.FindByTag( aTag);
+	if ( Result == None )
+		Result = Spawn(class'FV_PathBlocker', self, aTag);
+	return Result;
 }
 
 

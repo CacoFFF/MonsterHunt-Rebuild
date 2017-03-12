@@ -11,9 +11,15 @@ var(Debug) MHI_Base Interface;
 var(Debug) NavigationPoint DeferTo;
 //Pointer to net breifing element!
 var(Debug) bool bDiscovered;
-var(Debug) bool bCompleted;
 var(Debug) bool bPostInit;
-var(Debug) bool bAttractBots;
+var(Debug) bool bCompleted; //Disable if the event is temporarily unavailable (ex: interpolating button)
+var(Debug) bool bAttractBots; //Never enable if Event cannot yet function or if it doesn't unlock anything (ex: disabled trigger, door trigger)
+//Regarding attraction after hitting a door
+//The MHE_Base actor's Tag can redirect
+
+//Query tags are good tools
+var int PathQueryTag;
+var int EventQueryTag;
 
 var(Debug) enum EDeferToMode
 {
@@ -36,7 +42,7 @@ function PostInit()
 }
 
 function bool CausesEvent( name aEvent);
-
+function name RequiredEvent(); //If this MHE_Base needs to be enabled, provide a tag
 
 function bool ShouldDefer( Pawn Other)
 {

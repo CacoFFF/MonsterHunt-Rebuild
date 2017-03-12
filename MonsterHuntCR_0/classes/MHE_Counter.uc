@@ -3,6 +3,7 @@ class MHE_Counter expands MHE_Base;
 var Counter MarkedCounter;
 var MHE_Counter NextSameTag; //Another counter with same tag
 var bool bFirstCounter;
+var bool bEnabledWithoutSpawner;
 var bool bSpawnerContains;
 var bool bSpawnerCompletes;
 
@@ -30,6 +31,11 @@ function RegisterCounter( Counter NewCounter)
 function bool CausesEvent( name aEvent)
 {
 	return !bCompleted && (MarkedCounter != None) && (MarkedCounter.Event == aEvent);
+}
+function name RequiredEvent() //Will this redirect bots towards monsters?
+{
+	if ( !bCompleted && (MarkedCounter != None) )
+		return MarkedCounter.Tag;
 }
 
 //Get rid of this Event
@@ -102,24 +108,38 @@ function PostInit()
 	local ThingFactory TF;
 	local int CountersTotal;
 
-	if ( bFirstCounter && (Briefing != None) )
+	if ( Briefing != None )
 	{
-		CountersTotal = ActiveCounters();
-		For ( MHE=Briefing.MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
-			if ( MHE.Tag == Tag )
-			{
-				if ( MHE.IsA('MHE_MonsterSpawner') && !bSpawnerContains )
+		if ( bFirstCounter )
+		{
+			CountersTotal = ActiveCounters();
+			//Identify other trigger
+			//Monster Spawner never return true because it doesn't really directly trigger this actor
+			For ( MHE=Briefing.MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
+				if ( MHE.CausesEvent(Tag) && !MHE.IsA('MHE_MonsterSpawner') && !MHE.IsA('MHE_BB_MonsterSpawner') )
 				{
-					MHE_MonsterSpawner(MHE).Counter = self;
-					MHE_MonsterSpawner(MHE).CountersTotal = CountersTotal;
-					TF = MHE_MonsterSpawner(MHE).MarkedFactory;
 					For ( C=self ; C!=none ; C=C.NextSameTag )
+						C.bEnabledWithoutSpawner = true;
+					break;
+				}
+			
+			//Identify monster spawners related to this
+			For ( MHE=Briefing.MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
+				if ( MHE.Tag == Tag )
+				{
+					if ( MHE.IsA('MHE_MonsterSpawner') && !bSpawnerContains )
 					{
-						C.bSpawnerContains = true;
-						C.bSpawnerCompletes = TF.Capacity + TF.NumItems >= C.MarkedCounter.NumToCount;
+						MHE_MonsterSpawner(MHE).Counter = self;
+						MHE_MonsterSpawner(MHE).CountersTotal = CountersTotal;
+						TF = MHE_MonsterSpawner(MHE).MarkedFactory;
+						For ( C=self ; C!=none ; C=C.NextSameTag )
+						{
+							C.bSpawnerContains = true;
+							C.bSpawnerCompletes = TF.Capacity + TF.NumItems + int(bEnabledWithoutSpawner) >= C.MarkedCounter.NumToCount;
+						}
 					}
 				}
-			}
+		}
 	}
 	Super.PostInit();
 }

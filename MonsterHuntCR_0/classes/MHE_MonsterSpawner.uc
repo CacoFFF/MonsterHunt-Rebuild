@@ -82,16 +82,17 @@ function UpdateInterface()
 			MHI.bSpawnFinished = bCompleted;
 			if ( !MHI.IsTopInterface() )
 				MHI.MoveToTop();
-			if ( Counter != None )
-			{
-				MHI.CountersLeft = Counter.ActiveCounters();
-				MHI.NextCounterLowest = Counter.GetLowestCounter();
-			}
-			else
-			{
-				MHI.CountersLeft = 0;
-				MHI.NextCounterLowest = 0;
-			}
+		}
+		
+		if ( Counter != None )
+		{
+			MHI.CountersLeft = Counter.ActiveCounters();
+			MHI.NextCounterLowest = Counter.GetLowestCounter();
+		}
+		else
+		{
+			MHI.CountersLeft = 0;
+			MHI.NextCounterLowest = 0;
 		}
 		
 		if ( bInterrupted && (MHI.EventIndex != OriginalIndex) )
@@ -111,7 +112,8 @@ function UpdateInterface()
 				MHI.EventIndex = OriginalIndex;
 				MHI.Briefing.InsertIEvent( MHI);
 			}
-			Destroy();
+			if ( MHI.CountersLeft == 0 )
+				Destroy(); //Destroy if all counters are finished
 		}
 	}
 }

@@ -3,9 +3,7 @@ class MHE_SingularEvent expands MHE_Base;
 
 var(Debug) Actor MarkedMechanism;
 var int AnalyzeDepth;
-var(Debug) bool bIsSlave; //Do not create interface
-var(Debug) bool bNotifyTriggerEnable;
-var(Debug) bool bNotifyTriggerHit;
+var bool bRecheckEvents;
 var(Debug) bool bTriggersMover;
 var(Debug) bool bTriggersDoor;
 var(Debug) bool bUnlocksStructure;
@@ -13,6 +11,7 @@ var(Debug) bool bUnlocksRoutes;
 var(Debug) bool bTriggersCounter;
 var(Debug) bool bTriggersPawn;
 var(Debug) bool bTriggersFactory;
+var(Debug) bool bMultiHit;
 var(Debug) string EventChain;
 
 //Trigger: bTriggerOnceOnly
@@ -33,16 +32,28 @@ function RegisterMechanism( Actor Other)
 }
 
 function SetAttraction();
+function BuildEventList();
 
 state TriggerState
 {
 	event BeginState()
 	{
-		AnalyzeEvent( MarkedMechanism.Event);
+		BuildEventList();
 		SetCollisionSize( MarkedMechanism.CollisionRadius, MarkedMechanism.CollisionHeight);
 		FindDeferPoint( MarkedMechanism);
 		SetAttraction();
 	}
+	
+	function BuildEventList()
+	{
+		Tag = MarkedMechanism.Tag;
+		ResetEvents();
+		AnalyzeEvent( MarkedMechanism.Event);
+		bRecheckEvents = false;
+		if ( Trigger(MarkedMechanism).bInitiallyActive )
+			Tag = MarkedMechanism.Event;
+	}
+
 	function SetAttraction()
 	{
 		local Trigger T;
@@ -51,6 +62,32 @@ state TriggerState
 			Destroy();
 		bAttractBots = (DeferTo != None) && T.bInitiallyActive && (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes);
 	}
+	
+	function name RequiredEvent()
+	{
+		local Trigger T;
+		T = Trigger(MarkedMechanism);
+		if ( (T != None) && !T.bInitiallyActive )
+			return T.Tag;
+	}
+	
+	//The trigger has been touched
+	event Trigger( Actor Other, Pawn EventInstigator)
+	{
+		if ( Tag == MarkedMechanism.Tag ) //The trigger is being enabled
+		{
+			if ( !bDiscovered )
+				Discover();
+			if ( Trigger(MarkedMechanism).bInitiallyActive )
+				Tag = MarkedMechanism.Event;
+		}
+		else //The trigger has been touched
+		{
+			bRecheckEvents = true;
+			bCompleted = !MarkedMechanism.bCollideActors;
+		}
+		SetAttraction();
+	}
 }
 
 //This is a simple bumpable button that triggers something
@@ -58,15 +95,13 @@ state ButtonState
 {
 	event BeginState()
 	{
-		local Mover M;
 		local Actor A;
 		local vector HL, HN;
 
-		M = Mover(MarkedMechanism);
-		AnalyzeEvent( M.Event);
-		AnalyzeEvent( M.BumpEvent);
-		AnalyzeEvent( M.PlayerBumpEvent);
-		Tag = M.Event;
+		BuildEventList();
+		
+		//Can be hit multiple times
+		bMultiHit = !Mover(MarkedMechanism).bTriggerOnceOnly && (Mover(MarkedMechanism).StayOpenTime <= 9999);
 		SetCollisionSize( 0, 0);
 		FindDeferPoint( MarkedMechanism);
 		//This MHE should be inside the world!
@@ -86,14 +121,28 @@ state ButtonState
 		}
 		SetAttraction();
 	}
+
+	function BuildEventList()
+	{
+		Tag = '';
+		ResetEvents();
+		AnalyzeEvent( MarkedMechanism.Event);
+		AnalyzeEvent( Mover(MarkedMechanism).BumpEvent);
+		AnalyzeEvent( Mover(MarkedMechanism).PlayerBumpEvent);
+		bRecheckEvents = false;
+		Tag = MarkedMechanism.Event;
+	}
+	
 	function SetAttraction()
 	{
 		local Mover M;
 		
 		M = Mover(MarkedMechanism);
-		bCompleted = bCompleted || (!M.bInterpolating && (M.KeyNum == M.NumKeys-1)); //Set completed just in case
+		bCompleted = (bCompleted && !bMultiHit) || (!M.bInterpolating && (M.KeyNum == M.NumKeys-1)); //Set completed just in case
 		bAttractBots = (DeferTo != None) && !bCompleted && (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes);
 	}
+
+	//The button has finished interpolating
 	event Trigger( Actor Other, Pawn EventInstigator)
 	{
 		if ( Other == MarkedMechanism )
@@ -102,19 +151,12 @@ state ButtonState
 				Discover();
 			bCompleted = true;
 			SetAttraction();
+			bRecheckEvents = true;
+			if ( !bMultiHit )
+				Destroy();
 		}
 	}
 }
-
-state ShootTrigger
-{
-}
-
-state ShootWall
-{
-}
-
-
 
 
 function bool CausesEvent( name aEvent)
@@ -132,12 +174,24 @@ final function AddEvent( name aEvent)
 	EventChain = EventChain $ string(aEvent) $ ";";
 }
 
+function ResetEvents()
+{
+	bTriggersMover = false;
+	bUnlocksStructure = false;
+	bTriggersCounter = false;
+	bTriggersPawn = false;
+	bTriggersFactory = false;
+	bUnlocksRoutes = false;
+	EventChain = ";";
+}
+
 function AnalyzeEvent( name aEvent)
 {
 	local Actor A;
 	local Mover M;
-	
-	if ( aEvent == '' || aEvent == 'None' || (AnalyzeDepth > 20) || HasEvent(aEvent) )
+	local int i;
+	//Avoid registering the mechanism's tag if possible
+	if ( aEvent == '' || aEvent == 'None' || aEvent == Tag || (AnalyzeDepth > 20) || HasEvent(aEvent) )
 		return;
 	AddEvent(aEvent);
 	
@@ -146,18 +200,22 @@ function AnalyzeEvent( name aEvent)
 	{
 		if ( A.IsA('Mover') )
 		{
-			if ( InStr(A.InitialState,"Trigger") != -1 ) 
+			if ( InStr( A.GetStateName(),"Trigger") != -1 ) 
 			{
 				bTriggersMover = true;
 				M = Mover(A);
-				AnalyzeEvent( M.Event); //Identify this Mover's event as caused by self
-				if ( M.bTriggerOnceOnly )
-					bUnlocksStructure = true;
+				if ( !M.bInterpolating && (M.KeyNum == 0) )
+				{
+					AnalyzeEvent( M.Event); //Identify this Mover's event as caused by self
+					if ( M.bTriggerOnceOnly || (M.StayOpenTime > 9999) )
+						bUnlocksStructure = true;
+				}
 			}
 		}
 		else if ( A.IsA('Counter') )
 		{
-			bTriggersCounter = true;
+			if ( Counter(A).NumToCount > 0 )
+				bTriggersCounter = true;
 		}
 		else if ( A.bIsPawn )
 		{
@@ -165,11 +223,18 @@ function AnalyzeEvent( name aEvent)
 		}
 		else if ( A.IsA('ThingFactory') )
 		{
-			bTriggersFactory = true;
+			if ( ThingFactorY(A).Capacity > 0 )
+				bTriggersFactory = true;
 		}
 		else if ( A.IsA('NavigationPoint') )
 		{
-			bUnlocksRoutes = true;
+			if ( (BlockedPath(A) == None) || (BlockedPath(A).ExtraCost > 0) )
+				bUnlocksRoutes = true;
+		}
+		else if ( A.IsA('Dispatcher') )
+		{
+			For ( i=0 ; i<8 ; i++ )
+				AnalyzeEvent( Dispatcher(A).OutEvents[i] );
 		}
 	}
 	AnalyzeDepth--;
@@ -183,9 +248,12 @@ event Timer()
 	if ( MarkedMechanism == None || MarkedMechanism.bDeleteMe )
 	{
 		SetTimer(0,false);
+		//Destroy()
 		return;
 	}
 	
+	if ( bRecheckEvents || FRand() < 0.1 )
+		BuildEventList();
 	SetAttraction();
 	if ( !bDiscovered  )
 	{

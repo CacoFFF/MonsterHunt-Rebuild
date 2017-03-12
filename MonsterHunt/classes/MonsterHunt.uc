@@ -17,6 +17,7 @@ var bool bCountMonstersAgain; //Monster counting isn't immediate, helps other mu
 var bool bCheckEndLivesAgain;
 var bool bSkipThisMonster; //Mutator doesn't want this monster to be difficulty-scaled
 var bool bQueryEnemies;
+var int PathQueryTag;
 
 //User-define kill scores
 var() config name MonsterKillType[10];
@@ -277,6 +278,16 @@ function bool ChangeTeam(Pawn Other, int NewTeam)
 	return Result;
 }
 
+static function string CreatureKillMessage(name damageType, pawn Other)
+{
+	local string message;
+
+	message = Super.CreatureKillMessage( damageType, Other);
+	if ( Right(message,1) == "." )
+		message = Left( message, len(message)-1);
+	return message;
+}
+
 function Killed( Pawn Killer, Pawn Other, name DamageType)
 {
 	if ( ScriptedPawn(Killer) != None )
@@ -291,6 +302,8 @@ function Killed( Pawn Killer, Pawn Other, name DamageType)
 
 function MonsterKill( ScriptedPawn Killer, Pawn Other, name DamageType)
 {
+	local string Msg;
+
 	if ( Other == None || Killer == None )
 		return;
 
@@ -304,8 +317,19 @@ function MonsterKill( ScriptedPawn Killer, Pawn Other, name DamageType)
 		Other.PlayerReplicationInfo.Score -= 5;
 		if ( ReachableEnemy == None || ReachableEnemy.bDeleteMe || Killer.bIsBoss )
 			ReachableEnemy = Killer;
-		BroadcastMessage( Killer.KillMessage( DamageType, Other), false, 'DeathMessage');
+		Msg = Killer.KillMessage( DamageType, Other);
 	}
+	else if ( ScriptedPawn(Other) != None )
+	{
+		if ( Other != Killer )
+		{
+			Msg = Killer.GetHumanName() $ CreatureKillMessage(DamageType,Other) $ Other.GetHumanName();
+			Msg = Caps(Left(Msg,1)) $ Mid(Msg,1);
+		}
+	}
+	
+	if ( Msg != "" )
+		BroadcastMessage( Msg, false, 'DeathMessage');
 }
 
 function ScoreKill( Pawn Killer, Pawn Other)
@@ -484,16 +508,126 @@ function int NearbyTeammates_XC( Pawn Other, float Distance, bool bVisible)
 	return i;
 }
 
-//Returns whether this objective should cause bot attraction
-function Actor ValidateObjective( Pawn Other, Actor Objective)
+//Returns 'tag' of whatever needs to be unlocked to reach next path
+function Name EvaluateNextNodeDoor( Pawn Other, NavigationPoint NextPath)
 {
-	if ( Objective == None || Objective.bDeleteMe )
-		return None;
-	if ( Objective.bIsPawn && (Pawn(Objective).Health > 0) )
-		return Objective;
-//	if ( MonsterWaypoint(Objective) != None && MonsterWaypoint(
-// Later
+	local Actor A, B;
+	local vector HitLocation, HitNormal;
+
+	if ( (Other == None) || (NextPath == None) || (NextPath.UpstreamPaths[0] == -1) ) //Not selected by navigation code
+		return '';
+	ForEach Other.TraceActors( class'Actor', A, HitLocation, HitNormal, NextPath.Location)
+		if ( A.IsA('Mover') && (InStr( string(A.InitialState),"Trigger") != -1) )
+		{
+			ForEach Other.TraceActors( class'Actor', B, HitLocation, HitNormal, HitLocation+HitNormal, Other.Location, vect(17,17,39) )
+				if ( B.Event == A.Tag )
+				{
+					if ( (Trigger(B) != None) && !Trigger(B).bInitiallyActive )
+						return B.Tag;
+					return '';
+				}
+			return A.Tag;
+		}
+	return '';
 }
+
+//Find what triggers this 'tag' and evaluate reachability
+//List all available MHE_Base actors
+function bool ModifyObjectiveDoor( Bot Other, name RequiredEvent, NavigationPoint NextPath)
+{
+	local MHE_Base Events[16], Link;
+	local MHE_Base CurLink;
+	local name CurEvent, tmpEvent;
+	local int iE, i;
+	local float Dist;
+	local FV_PathBlocker FVPB;
+	local bool bFinished;
+
+	if ( (Other == None) || (NextPath == None) || (RequiredEvent == '') )
+		return false;
+
+	//Prepare a list of available events (direct triggers and chained triggers)
+	PathQueryTag++;
+	CurEvent = RequiredEvent;
+	while ( !bFinished )
+	{
+		bFinished = true;
+		Link = Briefing.FindNextTrigger( CurEvent, Link);
+		if ( (Link != None) && (Link.PathQueryTag != PathQueryTag) )
+		{
+			bFinished = false;
+			Link.PathQueryTag = PathQueryTag;
+			if ( !Link.bCompleted && (iE < 16) )
+				Events[iE++] = Link;
+		}
+		else
+		{
+			For ( i=0 ; i<iE ; i++ )
+			{
+				tmpEvent = Events[i].RequiredEvent();
+				if ( tmpEvent != '' ) //This event needs to be enabled
+				{	
+					Events[i] = Events[--iE]; //Cache and remove from list
+					CurEvent = tmpEvent; //Specify new Event to search
+					Link = None;
+					bFinished = false; //And do the lookup again
+					break;
+				}
+			}
+		}
+	}
+	
+	//Sort by distance
+	For ( i=1 ; i<iE ; i++ )
+		if ( VSize(Events[i].Location-Other.Location) < VSize(Events[i-1].Location-Other.Location) )
+		{
+			Link = Events[i];
+			Events[i] = Events[i-1];
+			Events[i-1] = Link;
+			if ( i > 1 )
+				i -= 2;
+		}
+	
+	//Get nearest attraction point
+	//Start with stuff that aren't objective markers
+	For ( i=0 ; i<iE ; i++ )
+		if ( !Events[i].ShouldDefer(Other) || !Events[i].bAttractBots )
+		{
+			Dist = VSize( Events[i].Location - Other.Location);
+			if ( Dist > 1500 )
+				break;
+			//Attraction point is nearby, send bot instead of altering objective
+			if ( ((Dist < 200) && Other.FastTrace(Events[i].Location))
+			|| ( AttractTo(Other,Events[i],true) && (Other.MoveTarget == Events[i]) ) )
+			{
+				Other.MoveTarget = Events[i];
+				return false;
+			}
+		}
+	
+	//Lock the paths, we need to find a route
+	FVPB = Briefing.GetPathBlocker( RequiredEvent);
+	FVPB.SetupBlock( NextPath, RequiredEvent);
+	For ( i=0 ; i<iE ; i++ ) //bCompleted check already done
+	{
+		if ( Events[i].bAttractBots && (Events[i].DeferTo != None) )
+		{
+			if ( !Events[i].ShouldDefer( Other) )
+			{
+				Other.MoveTarget = Events[i];
+				return false;
+			}
+			if ( AttractTo( Other, Events[i].DeferTo, true) )
+			{
+				Other.OrderObject = Events[i];
+				return true;
+			}
+		}
+	}
+}
+
+
+
 
 
 //Sets MoveTarget on pawn
@@ -573,6 +707,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	local int BotID;
 	local float BotState;
 	local ScriptedPawn Enemy;
+	local name RequiredEvent;
 	local bool bAttract;
 
 	if ( aBot.LastAttractCheck == Level.TimeSeconds )
@@ -583,7 +718,9 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		aBot.GotoState('GameEnded');
 		return False;
 	}
-
+	
+	if ( (aBot.OrderObject != None) && aBot.OrderObject.bDeleteMe )
+		aBot.OrderObject = None;
 	if ( Level.TimeSeconds - aBot.LastAttractCheck > 0.3 )
 		TaskMonstersVsBot(aBot);
 	aBot.LastAttractCheck = Level.TimeSeconds;
@@ -742,6 +879,12 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	}
 	return False;
 ATTRACT_DEST:
+	if ( NavigationPoint(aBot.MoveTarget) != None )
+	{
+		RequiredEvent = EvaluateNextNodeDoor( aBot, NavigationPoint(aBot.MoveTarget));
+		if ( RequiredEvent != '' )
+			ModifyObjectiveDoor( aBot, RequiredEvent, NavigationPoint(aBot.MoveTarget));
+	}
 	SetAttractionStateFor(aBot);
 	return true;
 }
@@ -915,7 +1058,8 @@ function AddToTeam( int num, Pawn Other )
 	if ( Other.IsA('PlayerPawn') )
 	{
 		Other.PlayerReplicationInfo.TeamID = 0;
-		PlayerPawn(Other).ClientChangeTeam(Other.PlayerReplicationInfo.Team);
+		//This messes up player's Team in URL
+//		PlayerPawn(Other).ClientChangeTeam(Other.PlayerReplicationInfo.Team);
 	}
 	else
 		Other.PlayerReplicationInfo.TeamID = 1;
