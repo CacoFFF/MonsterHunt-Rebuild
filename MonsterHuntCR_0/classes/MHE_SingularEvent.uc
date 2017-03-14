@@ -5,12 +5,13 @@ var(Debug) Actor MarkedMechanism;
 var int AnalyzeDepth;
 var bool bRecheckEvents;
 var(Debug) bool bTriggersMover;
-var(Debug) bool bTriggersDoor;
 var(Debug) bool bUnlocksStructure;
 var(Debug) bool bUnlocksRoutes;
 var(Debug) bool bTriggersCounter;
 var(Debug) bool bTriggersPawn;
 var(Debug) bool bTriggersFactory;
+var(Debug) bool bTogglesTriggers;
+var(Debug) bool bModifiesTriggers; //Important
 var(Debug) bool bMultiHit;
 var(Debug) string EventChain;
 
@@ -38,7 +39,10 @@ state TriggerState
 {
 	event BeginState()
 	{
+		bMultiHit = !Trigger(MarkedMechanism).bTriggerOnceOnly;
 		BuildEventList();
+		if ( bDeleteMe )
+			return;
 		SetCollisionSize( MarkedMechanism.CollisionRadius, MarkedMechanism.CollisionHeight);
 		FindDeferPoint( MarkedMechanism);
 		SetAttraction();
@@ -46,29 +50,45 @@ state TriggerState
 	
 	function BuildEventList()
 	{
+		local Trigger T;
 		Tag = MarkedMechanism.Tag;
 		ResetEvents();
 		AnalyzeEvent( MarkedMechanism.Event);
 		bRecheckEvents = false;
-		if ( Trigger(MarkedMechanism).bInitiallyActive )
+		T = Trigger(MarkedMechanism);
+		if ( T.bInitiallyActive )
 			Tag = MarkedMechanism.Event;
+		else if ( (T.ReTriggerDelay > 0) && (Level.TimeSeconds - T.TriggerTime < T.ReTriggerDelay) )
+			bRecheckEvents = true;
+		ClearIfUseless();
 	}
 
 	function SetAttraction()
 	{
 		local Trigger T;
+		local bool bReady;
+		
 		T = Trigger(MarkedMechanism);
 		if ( T == None || T.bDeleteMe || !T.bCollideActors )
 			Destroy();
-		bAttractBots = (DeferTo != None) && T.bInitiallyActive && (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes);
+		bReady = T.bInitiallyactive && ((T.ReTriggerDelay <= 0) || (Level.TimeSeconds - T.TriggerTime >= T.ReTriggerDelay));
+		bAttractBots = (DeferTo != None) && bReady && (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers);
 	}
 	
 	function name RequiredEvent()
 	{
 		local Trigger T;
 		T = Trigger(MarkedMechanism);
-		if ( (T != None) && !T.bInitiallyActive )
-			return T.Tag;
+		if ( T != None )
+		{	
+			if ( T.IsInState('OtherTriggerTurnsOff') )
+			{
+				if ( T.bInitiallyActive )
+					return T.Tag;
+			}
+			else if ( !T.bInitiallyActive )
+				return T.Tag;
+		}
 	}
 	
 	//The trigger has been touched
@@ -98,10 +118,12 @@ state ButtonState
 		local Actor A;
 		local vector HL, HN;
 
-		BuildEventList();
-		
 		//Can be hit multiple times
 		bMultiHit = !Mover(MarkedMechanism).bTriggerOnceOnly && (Mover(MarkedMechanism).StayOpenTime <= 9999);
+		BuildEventList();
+		if ( bDeleteMe )
+			return;
+			
 		SetCollisionSize( 0, 0);
 		FindDeferPoint( MarkedMechanism);
 		//This MHE should be inside the world!
@@ -114,7 +136,7 @@ state ButtonState
 					SetLocation( HL);
 					break;
 				}
-			SetLocation( Location + Normal(DeferTo.Location-Location) * vect(1,1,2) );
+			SetLocation( Location );
 			if ( FastTrace( Location - vect(0,0,30)) )
 				SetLocation( Location - vect(0,0,10) );
 			SetCollisionSize( 10, 30);
@@ -131,6 +153,7 @@ state ButtonState
 		AnalyzeEvent( Mover(MarkedMechanism).PlayerBumpEvent);
 		bRecheckEvents = false;
 		Tag = MarkedMechanism.Event;
+		ClearIfUseless();
 	}
 	
 	function SetAttraction()
@@ -139,7 +162,7 @@ state ButtonState
 		
 		M = Mover(MarkedMechanism);
 		bCompleted = (bCompleted && !bMultiHit) || (!M.bInterpolating && (M.KeyNum == M.NumKeys-1)); //Set completed just in case
-		bAttractBots = (DeferTo != None) && !bCompleted && (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes);
+		bAttractBots = (DeferTo != None) && !bCompleted && (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers);
 	}
 
 	//The button has finished interpolating
@@ -182,7 +205,16 @@ function ResetEvents()
 	bTriggersPawn = false;
 	bTriggersFactory = false;
 	bUnlocksRoutes = false;
+	bTogglesTriggers = false;
+	bModifiesTriggers = false;
 	EventChain = ";";
+}
+
+function ClearIfUseless()
+{
+	if ( !bMultiHit || bTriggersMover || bUnlocksStructure || bTriggersCounter || bTriggersPawn || bTriggersFactory || bUnlocksRoutes )
+		return;
+	Destroy();
 }
 
 function AnalyzeEvent( name aEvent)
@@ -235,6 +267,17 @@ function AnalyzeEvent( name aEvent)
 		{
 			For ( i=0 ; i<8 ; i++ )
 				AnalyzeEvent( Dispatcher(A).OutEvents[i] );
+		}
+		else if ( A.IsA('Trigger') )
+		{
+			if ( A.bCollideActors )
+			{
+				if ( A.IsInState('TriggerToggle') )
+					bTogglesTriggers = true;
+				else if ( (A.IsInState('OtherTriggerTurnsOn') && !Trigger(A).bInitiallyActive)
+						|| (A.IsInState('OtherTriggerTurnsOff') && Trigger(A).bInitiallyActive) )
+					bModifiesTriggers = true;
+			}
 		}
 	}
 	AnalyzeDepth--;

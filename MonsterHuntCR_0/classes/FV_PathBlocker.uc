@@ -73,11 +73,13 @@ event Destroyed()
 
 //If the list fills up before ALL reachspecs are evaluated, don't despair
 //A new FV_PathBlocker will be spawned and pick up where we left off here
+
+//Here Nav is the destination route
 function SetupBlock( NavigationPoint Nav, name DoorTag)
 {
 	local Actor Start, End, A;
 	local int rD, rF;
-	local int i, j;
+	local int i;
 	local vector HitLocation, HitNormal;
 	
 	if ( Nav == None )
@@ -95,7 +97,7 @@ function SetupBlock( NavigationPoint Nav, name DoorTag)
 					BlockedStarts[BlockedCount] = NavigationPoint(Start);
 					BlockedDestinations[BlockedCount] = Nav;
 					class'MHCR_Statics'.static.RemovePathFrom( BlockedStarts[BlockedCount], ReachSpec[Blockedcount] );
-					class'MHCR_Statics'.static.RemoveUPathFrom( Nav, ReachSpec[Blockedcount], i);
+					class'MHCR_Statics'.static.RemoveUPathFrom( BlockedDestinations[BlockedCount], ReachSpec[Blockedcount], i);
 					if ( ++BlockedCount >= ArrayCount(ReachSpec) )
 						return;
 					i--;
@@ -106,3 +108,32 @@ function SetupBlock( NavigationPoint Nav, name DoorTag)
 	}
 }
 
+//Here T is the starting teleporter
+function SetupTeleporter( Teleporter T)
+{
+	local Actor Start, End;
+	local Teleporter TEnd;
+	local int rD, rF;
+	local int i;
+
+	if ( T == None || !T.bEnabled || T.URL == "" )
+		return;
+		
+	while ( (i<16) && (T.Paths[i] != -1) )
+	{
+		describeSpec( T.Paths[i], Start, End, rF, rD);
+		TEnd = Teleporter(End);
+		if ( (TEnd != None) && (string(TEnd.Tag) ~= T.URL) && (Start == T) )
+		{
+			ReachSpec[Blockedcount] = T.Paths[i];
+			BlockedStarts[BlockedCount] = T;
+			BlockedDestinations[BlockedCount] = TEnd;
+			class'MHCR_Statics'.static.RemovePathFrom( BlockedStarts[BlockedCount], ReachSpec[Blockedcount], i);
+			class'MHCR_Statics'.static.RemoveUPathFrom( BlockedDestinations[BlockedCount], ReachSpec[Blockedcount]);
+			if ( ++BlockedCount >= ArrayCount(ReachSpec) )
+				return;
+			continue;
+		}
+		i++;
+	}
+}

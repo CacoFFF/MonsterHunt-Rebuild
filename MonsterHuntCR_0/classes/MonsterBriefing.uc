@@ -15,6 +15,7 @@ var MonsterPlayerData InactiveDatas;
 var MonsterAuthenticator AuthenticatorList;
 var FV_PathBlocker BlockerList;
 var int EventQueryTag;
+var int PathQueryTag;
 
 var int CurrentIndex;
 var int CurrentTime;
@@ -168,7 +169,7 @@ state Server
 		local Mover M;
 
 		ForEach AllActors( class'Trigger', T)
-			if ( (T.Class == class'Trigger') && T.bTriggerOnceOnly )
+			if ( (T.Class == class'Trigger') )
 				Spawn( class'MHE_SingularEvent', self).RegisterMechanism( T);
 				
 		ForEach AllActors( class'Mover', M)
@@ -255,6 +256,41 @@ function MHE_Base GetNextBotAttractor()
 	}
 	TempEvent = None;
 }
+
+//Prepare a list of available events (direct triggers and chained triggers)
+function EnumerateTriggers( name aEvent, out MHE_Base Events[16], out int EventCount )
+{
+	local MHE_Base Link;
+	local name tmpEvent;
+	local int i, LoopCount;
+
+	PathQueryTag++;
+	EventCount = 0;
+NEXT_TRIGGER: //Trigger scanner
+	Link = FindNextTrigger( aEvent, Link);
+	if ( (Link != None) && (Link.PathQueryTag != PathQueryTag) )
+	{
+		Link.PathQueryTag = PathQueryTag;
+		if ( !Link.bCompleted && (EventCount < 16) )
+			Events[EventCount++] = Link;
+		Goto NEXT_TRIGGER;
+	}
+	if ( LoopCount++ > 50 ) //Triggering each other I see?
+		return;
+	while ( i<EventCount )
+	{
+		tmpEvent = Events[i].RequiredEvent();
+		if ( (tmpEvent != '') && (tmpEvent != aEvent) ) //This event needs to be enabled
+		{
+			Events[i] = Events[--EventCount]; //Cache and remove from list
+			aEvent = tmpEvent; //Specify new Event to search
+			Link = None;
+			Goto NEXT_TRIGGER;
+		}
+		i++;
+	}
+}
+
 
 function MHE_Base FindNextTrigger( name aEvent, optional MHE_Base LastFound)
 {

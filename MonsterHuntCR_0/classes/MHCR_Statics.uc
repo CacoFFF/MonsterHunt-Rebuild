@@ -55,10 +55,10 @@ static final function AddUPathTo( NavigationPoint N, int iPath)
 	}
 }
 
-static final function RemovePathFrom( NavigationPoint N, int iPath)
+static final function RemovePathFrom( NavigationPoint N, int iPath, optional int StartAt)
 {
 	local int i, k;
-	For ( i=0 ; i<16 ; i++ )
+	For ( i=StartAt ; i<16 ; i++ )
 	{
 		if ( N.Paths[i] < 0 )
 			break;

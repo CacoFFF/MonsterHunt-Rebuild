@@ -24,6 +24,12 @@ event Trigger( Actor Other, Pawn EventInstigator)
 		CheckState();
 }
 
+//If nothing else activates the counter, then take up the responsibility
+function bool CausesEvent( name aEvent)
+{
+	return !bDiscovered && (Counter != None) && !Counter.bEnabledWithoutSpawner;
+}
+
 function CheckState()
 {
 	bInterrupted = false;

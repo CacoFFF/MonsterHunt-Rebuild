@@ -54,6 +54,10 @@ event InitGame(string Options, out string Error)
 	bNoMonsters = False;
 	MaxAllowedTeams = 1;
 
+	//Beta auto-upgrade
+	if ( ClientExtensionClass == "MonsterBetaCL_0.MHCL_MonsterBriefing" )
+		ClientExtensionClass = "MonsterBetaCL_1.MHCL_MonsterBriefing";
+	
 	BriefingClass = class<MonsterBriefing>( DynamicLoadObject(ClientExtensionClass,class'class') );
 	if ( BriefingClass == None )
 	{
@@ -281,10 +285,12 @@ function bool ChangeTeam(Pawn Other, int NewTeam)
 static function string CreatureKillMessage(name damageType, pawn Other)
 {
 	local string message;
+	local int i;
 
 	message = Super.CreatureKillMessage( damageType, Other);
-	if ( Right(message,1) == "." )
-		message = Left( message, len(message)-1);
+	i = InStr( message, ".");
+	if ( i != -1 )
+		message = Left( message, i) $ Mid( message, i+1);
 	return message;
 }
 
@@ -323,7 +329,9 @@ function MonsterKill( ScriptedPawn Killer, Pawn Other, name DamageType)
 	{
 		if ( Other != Killer )
 		{
-			Msg = Killer.GetHumanName() $ CreatureKillMessage(DamageType,Other) $ Other.GetHumanName();
+			Msg = Other.GetHumanName() $ CreatureKillMessage(DamageType,Other) $ Killer.GetHumanName();
+			while ( Left(Msg,1) == " " )
+				Msg = Mid(Msg,1);
 			Msg = Caps(Left(Msg,1)) $ Mid(Msg,1);
 		}
 	}
@@ -509,15 +517,38 @@ function int NearbyTeammates_XC( Pawn Other, float Distance, bool bVisible)
 }
 
 //Returns 'tag' of whatever needs to be unlocked to reach next path
-function Name EvaluateNextNodeDoor( Pawn Other, NavigationPoint NextPath)
+function Name EvaluateNextNodeTeleporter( Pawn Other)
 {
 	local Actor A, B;
 	local vector HitLocation, HitNormal;
+	local Teleporter Tele;
 
-	if ( (Other == None) || (NextPath == None) || (NextPath.UpstreamPaths[0] == -1) ) //Not selected by navigation code
+	Tele = Teleporter(Other.MoveTarget);
+	if ( Tele == None )
+		Tele = Teleporter( Other.RouteCache[0] );
+	if ( (Tele == None) || (Teleporter(Other.RouteCache[1]) == None) ) //Not going through teleporter
 		return '';
+
+	if ( !Tele.bEnabled )
+		return Tele.Tag;
+	return '';
+}
+
+//Returns 'tag' of whatever needs to be unlocked to reach next path
+function Name EvaluateNextNodeDoor( Pawn Other)
+{
+	local Actor A, B;
+	local vector HitLocation, HitNormal;
+	local NavigationPoint NextPath;
+
+	NextPath = NavigationPoint(Other.MoveTarget);
+	if ( NextPath == None )
+		NextPath = Other.RouteCache[0];
+	if ( (NextPath == None) || (NextPath.UpstreamPaths[0] == -1) ) //Not selected by navigation code
+		return '';
+
 	ForEach Other.TraceActors( class'Actor', A, HitLocation, HitNormal, NextPath.Location)
-		if ( A.IsA('Mover') && (InStr( string(A.InitialState),"Trigger") != -1) )
+		if ( A.IsA('Mover') && (InStr( string(A.InitialState),"Trigger") != -1) && (Mover(A).SavedTrigger == None) )
 		{
 			ForEach Other.TraceActors( class'Actor', B, HitLocation, HitNormal, HitLocation+HitNormal, Other.Location, vect(17,17,39) )
 				if ( B.Event == A.Tag )
@@ -533,49 +564,25 @@ function Name EvaluateNextNodeDoor( Pawn Other, NavigationPoint NextPath)
 
 //Find what triggers this 'tag' and evaluate reachability
 //List all available MHE_Base actors
-function bool ModifyObjectiveDoor( Bot Other, name RequiredEvent, NavigationPoint NextPath)
+//BlockType codes:
+// - 1: Door
+// - 2: Teleporter
+function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 {
 	local MHE_Base Events[16], Link;
-	local MHE_Base CurLink;
-	local name CurEvent, tmpEvent;
 	local int iE, i;
 	local float Dist;
 	local FV_PathBlocker FVPB;
-	local bool bFinished;
-
-	if ( (Other == None) || (NextPath == None) || (RequiredEvent == '') )
+	local NavigationPoint NextPath;
+	
+	NextPath = NavigationPoint(Other.MoveTarget);
+	if ( NextPath == None )
+		NextPath = Other.RouteCache[0];
+	if ( (NextPath == None) || (RequiredEvent == '') )
 		return false;
-
+		
 	//Prepare a list of available events (direct triggers and chained triggers)
-	PathQueryTag++;
-	CurEvent = RequiredEvent;
-	while ( !bFinished )
-	{
-		bFinished = true;
-		Link = Briefing.FindNextTrigger( CurEvent, Link);
-		if ( (Link != None) && (Link.PathQueryTag != PathQueryTag) )
-		{
-			bFinished = false;
-			Link.PathQueryTag = PathQueryTag;
-			if ( !Link.bCompleted && (iE < 16) )
-				Events[iE++] = Link;
-		}
-		else
-		{
-			For ( i=0 ; i<iE ; i++ )
-			{
-				tmpEvent = Events[i].RequiredEvent();
-				if ( tmpEvent != '' ) //This event needs to be enabled
-				{	
-					Events[i] = Events[--iE]; //Cache and remove from list
-					CurEvent = tmpEvent; //Specify new Event to search
-					Link = None;
-					bFinished = false; //And do the lookup again
-					break;
-				}
-			}
-		}
-	}
+	Briefing.EnumerateTriggers( RequiredEvent, Events, iE);
 	
 	//Sort by distance
 	For ( i=1 ; i<iE ; i++ )
@@ -587,7 +594,7 @@ function bool ModifyObjectiveDoor( Bot Other, name RequiredEvent, NavigationPoin
 			if ( i > 1 )
 				i -= 2;
 		}
-	
+
 	//Get nearest attraction point
 	//Start with stuff that aren't objective markers
 	For ( i=0 ; i<iE ; i++ )
@@ -607,9 +614,9 @@ function bool ModifyObjectiveDoor( Bot Other, name RequiredEvent, NavigationPoin
 	
 	//Lock the paths, we need to find a route
 	FVPB = Briefing.GetPathBlocker( RequiredEvent);
-	FVPB.SetupBlock( NextPath, RequiredEvent);
+	if		( BlockType == 1 )	FVPB.SetupBlock( NextPath, RequiredEvent);
+	else if	( BlockType == 2 )	FVPB.SetupTeleporter( Teleporter(NextPath) );
 	For ( i=0 ; i<iE ; i++ ) //bCompleted check already done
-	{
 		if ( Events[i].bAttractBots && (Events[i].DeferTo != None) )
 		{
 			if ( !Events[i].ShouldDefer( Other) )
@@ -617,13 +624,12 @@ function bool ModifyObjectiveDoor( Bot Other, name RequiredEvent, NavigationPoin
 				Other.MoveTarget = Events[i];
 				return false;
 			}
-			if ( AttractTo( Other, Events[i].DeferTo, true) )
+			if ( (Other.Orders != 'Follow') && AttractTo( Other, Events[i].DeferTo, true) )
 			{
 				Other.OrderObject = Events[i];
 				return true;
 			}
 		}
-	}
 }
 
 
@@ -879,11 +885,15 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	}
 	return False;
 ATTRACT_DEST:
-	if ( NavigationPoint(aBot.MoveTarget) != None )
+	NewDest = aBot.OrderObject;
+	RequiredEvent = EvaluateNextNodeDoor( aBot);
+	if ( RequiredEvent != '' )
+		ModifyObjective( aBot, RequiredEvent, 1); //Door Type
+	else
 	{
-		RequiredEvent = EvaluateNextNodeDoor( aBot, NavigationPoint(aBot.MoveTarget));
+		RequiredEvent = EvaluateNextNodeTeleporter( aBot);
 		if ( RequiredEvent != '' )
-			ModifyObjectiveDoor( aBot, RequiredEvent, NavigationPoint(aBot.MoveTarget));
+			ModifyObjective( aBot, RequiredEvent, 2); //Teleporter type
 	}
 	SetAttractionStateFor(aBot);
 	return true;
