@@ -548,7 +548,7 @@ function Name EvaluateNextNodeDoor( Pawn Other)
 		return '';
 
 	ForEach Other.TraceActors( class'Actor', A, HitLocation, HitNormal, NextPath.Location)
-		if ( A.IsA('Mover') && (InStr( string(A.InitialState),"Trigger") != -1) && (Mover(A).SavedTrigger == None) )
+		if ( A.IsA('Mover') && (InStr( string(A.InitialState),"Trigger") != -1) && !Mover(A).bInterpolating && !Mover(A).bDelaying && (Mover(A).SavedTrigger == None) )
 		{
 			ForEach Other.TraceActors( class'Actor', B, HitLocation, HitNormal, HitLocation+HitNormal, Other.Location, vect(17,17,39) )
 				if ( B.Event == A.Tag )

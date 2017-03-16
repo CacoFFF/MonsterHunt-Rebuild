@@ -9,6 +9,7 @@ var NavigationPoint BlockedDestinations[32];
 var NavigationPoint BlockedStarts[32];
 var int ReachSpec[32];
 var int BlockedCount;
+var float LastScanned;
 
 //No need to forward the call to NavigationPoint
 native(519) final function describeSpec(int iSpec, out Actor Start, out Actor End, out int ReachFlags, out int Distance); 
@@ -79,17 +80,20 @@ function SetupBlock( NavigationPoint Nav, name DoorTag)
 {
 	local Actor Start, End, A;
 	local int rD, rF;
-	local int i;
+	local int i, OrgBlocked;
 	local vector HitLocation, HitNormal;
+	local bool bOpposite;
+	local NavigationPoint N;
 	
 	if ( Nav == None )
 		return;
 
-	while ( (i<16) && (Nav.UpstreamPaths[i] != -1) )
+	while ( (i<16) && (Nav.UpstreamPaths[i] != -1) && (BlockedCount < ArrayCount(ReachSpec)) )
 	{
 		describeSpec( Nav.UpstreamPaths[i], Start, End, rF, rD); 
 		if ( (NavigationPoint(Start) != None) && (End == Nav) )
 		{
+			bOpposite = true;
 			ForEach Nav.TraceActors( class'Actor', A, HitLocation, HitNormal, Start.Location, Nav.Location, vect(17,17,39) )
 				if ( A.Tag == DoorTag ) //Can be a trigger... can be a mover
 				{
@@ -98,13 +102,48 @@ function SetupBlock( NavigationPoint Nav, name DoorTag)
 					BlockedDestinations[BlockedCount] = Nav;
 					class'MHCR_Statics'.static.RemovePathFrom( BlockedStarts[BlockedCount], ReachSpec[Blockedcount] );
 					class'MHCR_Statics'.static.RemoveUPathFrom( BlockedDestinations[BlockedCount], ReachSpec[Blockedcount], i);
-					if ( ++BlockedCount >= ArrayCount(ReachSpec) )
-						return;
+					SetLocation( HitLocation);
+					BlockedCount++;
+					bOpposite = false;
 					i--;
 					break;
 				}
+			//Try opposite direction with simple line
+			if ( bOpposite )
+			{
+				ForEach Start.TraceActors( class'Actor', A, HitLocation, HitNormal, End.Location )
+					if ( A.Tag == DoorTag ) //Can be a trigger... can be a mover
+					{
+						ReachSpec[Blockedcount] = Nav.UpstreamPaths[i];
+						BlockedStarts[BlockedCount] = NavigationPoint(Start);
+						BlockedDestinations[BlockedCount] = Nav;
+						class'MHCR_Statics'.static.RemovePathFrom( BlockedStarts[BlockedCount], ReachSpec[Blockedcount] );
+						class'MHCR_Statics'.static.RemoveUPathFrom( BlockedDestinations[BlockedCount], ReachSpec[Blockedcount], i);
+						SetLocation( HitLocation);
+						BlockedCount++;
+						i--;
+						break;
+					}
+			}
+
 		}
 		i++;
+	}
+
+	//This will add any UpstreamPath that was out of the list due to being more than 16
+	bOpposite = false;
+	if ( Level.TimeSeconds-LastScanned > 5 )
+	{
+		LastScanned = Level.TimeSeconds;
+		ForEach Nav.RadiusActors( class'NavigationPoint', N, 1000)
+		{
+			For ( i=0 ; (i<16) && (N.Paths[i] != -1) ; i++ )
+			{
+				describeSpec( N.Paths[i], Start, End, rF, rD); 
+				if ( (End == Nav) && (Start == N) )
+					class'MHCR_Statics'.static.AddUPathTo( Nav, N.Paths[i] );
+			}
+		}
 	}
 }
 
