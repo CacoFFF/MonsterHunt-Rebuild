@@ -9,6 +9,7 @@ var OLautomag slavemag;
 var bool isslave;				//Name kept to preserve net compatibility
 var bool bSetup;				// used for setting display properties
 var bool bBringingUp;
+var bool bReloading;
 
 
 replication
@@ -25,14 +26,17 @@ replication
 simulated function int ClientClipCount()
 {
 	local int Delta;
+	
+	if ( Level.NetMode != NM_Client )
+		return ClipCount;
+	
 	Delta = ClipCount - ClipCountCL;
 	ClipCountCL = ClipCount;
-	if ( Delta < 0 ) //Server added ammo to clip (reloaded?)
+	if ( (Delta < 0) || (Delta > 3) ) //Big, unusual changes mean lag or reload
 		FiredSinceUpdate = 0;
-	else if ( Delta > 3 ) //Massive lag, do not simulate
-		return ClipCount;
 	else if ( Delta > 0 ) //Server substracted ammo to clip
 		FiredSinceUpdate -= Delta;
+	FiredSinceUpdate = Max( 0, FiredSinceUpdate);
 	return ClipCountCL + FiredSinceUpdate;
 }
 
@@ -65,9 +69,11 @@ simulated function AnimEnd()
 simulated function PlayPostSelect()
 {
 	bBringingUp = false;
+	FixClips();
+	if ( Pawn(Owner).bFire + Pawn(Owner).bAltFire == 0 )
+		PlayIdleAnim();
 	Super.PlayPostSelect();
 }
-
 
 function DropFrom(vector StartLocation)
 {
@@ -162,6 +168,7 @@ function bool HandlePickupQuery( inventory Item )
 {
 	local Pawn P;
 	local Inventory Copy;
+	local int SwapBuffer;
 
 	if ( (Item.class == class) && (slavemag == None) ) 
 	{
@@ -175,6 +182,7 @@ function bool HandlePickupQuery( inventory Item )
 		//Ammo fix taken from LCWeapons
 		slavemag.PickupAmmoCount = OLautomag(Item).PickupAmmoCount;
 		slavemag.AmmoName = AmmoName;
+		slavemag.ClipCount = Max( 0, 20-slavemag.PickupAmmoCount);
 		PickupAmmoCount = slavemag.PickupAmmoCount;
 
 		SetTwoHands();
@@ -263,11 +271,13 @@ simulated event RenderOverlays(canvas Canvas)
 		}
 		if ( !bHideWeapon )
 		{
-			if ( Mesh == mesh'AutoML' )
+			if ( Mesh == Mesh'AutoMagL' )
 				PlayerOwner.Handedness = 1;
 			else if ( isslave || (slavemag != None) )
 				PlayerOwner.Handedness = -1;
 		}
+		if ( isslave && Level.NetMode == NM_Client && (ClientClipCount() >= 20) && !bReloading && IsInState('ClientIdleTemp') )
+			GotoState('ClientReloading');
 	}
 	if ( !bHideWeapon && ( (slavemag != None) || isslave ) )
 	{
@@ -289,6 +299,41 @@ simulated event RenderOverlays(canvas Canvas)
 		PlayerOwner.Handedness = realhand;
 }
 
+simulated function PostRender( Canvas Canvas)
+{
+	local int RightClip, LeftClip, SwapBuffer;
+	
+	RightClip = 20 - ClientClipCount();
+	if ( slavemag == None )	LeftClip = -1;
+	else					LeftClip = 20 - slavemag.ClientClipCount();
+	
+	if ( Mesh == Mesh'AutoMagL' ) //Left handed, swap clip values
+	{
+		SwapBuffer = LeftClip;
+		LeftClip = RightClip;
+		RightClip = SwapBuffer;
+	}
+
+	Canvas.Style = 3;
+	Canvas.Font = Canvas.SmallFont;
+	Canvas.DrawColor.B = 0;
+	//Draw right clip
+	if ( RightClip >= 0 )
+	{
+		Canvas.DrawColor.G = byte(float(RightClip) * 12.7);
+		Canvas.DrawColor.R = 255 - Canvas.DrawColor.G;
+		Canvas.SetPos(0.85 * Canvas.ClipX, 0.80 * Canvas.ClipY);
+		Canvas.DrawText("Clip: " $ string(RightClip));
+	}
+	if ( LeftClip >= 0 )
+	{
+		Canvas.DrawColor.G = byte(float(LeftClip) * 12.7);
+		Canvas.DrawColor.R = 255 - Canvas.DrawColor.G;
+		Canvas.SetPos(0.05 * Canvas.ClipX, 0.80 * Canvas.ClipY);
+		Canvas.DrawText("Clip: " $ string(LeftClip));
+	}
+}
+
 
 function BringUp()
 {
@@ -307,6 +352,7 @@ function TraceFire( float Accuracy )
 
 	RealOffset = FireOffset;
 	FireOffset *= 0.35;
+	ClipCount++;
 	if ( (slavemag != None) || isslave )
 		Accuracy = FClamp(3*Accuracy,0.05,3); //Automag is more accurate than enforcer
 	Super.TraceFire(Accuracy);
@@ -328,7 +374,7 @@ simulated function PlayIdleAnim()
 	else
 	{
 		LoopAnim('Sway1',0.02, 0.3);
-		if ( (Level.NetMode == NM_Client) && (Pawn(Owner) != None) && (Pawn(Owner).Weapon == self) )
+		if ( (Level.NetMode == NM_Client) && (Pawn(Owner) != None) && (Pawn(Owner).Weapon != None) && (Pawn(Owner).Weapon.class == class) )
 			GotoState('ClientIdleTemp');
 	}
 }
@@ -342,7 +388,9 @@ simulated function TweenToStill()
 simulated state ClientIdleTemp
 {
 Begin:
-	Sleep(3+FRand() );
+	Sleep(1);
+	FiredSinceUpdate = 0; //1 seconds without firing: reset clip count simulator. this fixes possible desyncs
+	Sleep(2+FRand() );
 	if ( FRand() < 0.5 )
 		bAnimLoop = false;
 	Goto('Begin');
@@ -382,6 +430,165 @@ AnimTweak:
 
 
 //==========================================
+// RELOADING
+//==========
+
+simulated function PlayEjectClip()
+{
+	PlayAnim('Eject',1.5,0.05);
+	Owner.PlayOwnedSound( Misc2Sound, SLOT_None, 1.0*Pawn(Owner).SoundDampening);	
+}
+
+simulated function PlayDown()
+{
+	PlayAnim('Down',1.2,0.05);
+}
+
+simulated function PlayAddClip()
+{
+	Owner.PlayOwnedSound(SelectSound, SLOT_None,1.0*Pawn(Owner).SoundDampening);	
+	PlayAnim('Select',1.6,0.07);
+}
+
+function FixClips()
+{
+	local int AvailableAmmo;
+
+	if ( isslave )
+		return;
+	if ( AmmoType == None )
+		GiveAmmo( Pawn(Owner));
+	if ( slavemag == None )
+		ClipCount = Max( 0, 20-AmmoType.AmmoAmount);
+	else
+	{	//Redistribute ammo among both automags
+		AvailableAmmo = Min( 40, AmmoType.AmmoAmount);
+		ClipCount = 20 - (AvailableAmmo/2 + AvailableAmmo%2);
+		slavemag.ClipCount = 20 - (AvailableAmmo/2);
+	}
+}
+
+//Calle on each enforcer
+function ResetClip()
+{
+	local int AvailableAmmo;
+	local OLautomag Master;
+	local Inventory Inv;
+	
+	if ( AmmoType == None )
+		GiveAmmo( Pawn(Owner));
+	if ( isslave )
+	{
+		For ( Inv=Owner.Inventory ; Inv!=None ; Inv=Inv.Inventory )
+			if ( (Inv.Class == Class) && (Inv != self) && (OLautomag(Inv).slavemag == self) )
+			{
+				AvailableAmmo = AmmoType.AmmoAmount + OLautomag(Inv).ClipCount - 20;
+				break;
+			}
+	}
+	else
+	{
+		AvailableAmmo = AmmoType.AmmoAmount;
+		if ( slavemag != None )
+			AvailableAmmo += slavemag.ClipCount - 20;
+	}
+	
+	if ( AvailableAmmo > 0 )
+		ClipCount = Max( 0, 20-AvailableAmmo);
+}
+
+state Reloading
+{
+	event BeginState()
+	{
+		bReloading = true;
+	}
+	event EndState()
+	{
+		bReloading = false;
+	}
+	function MasterFixClip()
+	{
+		local inventory Inv;
+		
+		For ( Inv=Owner.Inventory ; Inv!=None ; Inv=Inv.Inventory )
+			if ( (Inv.Class == Class) && (Inv != self) && (OLautomag(Inv).slavemag == self) )
+			{
+				OLautomag(Inv).FixClips();
+				break;
+			}
+			
+	}
+ignores Fire, AltFire;
+Begin:
+	PlayEjectClip();
+	ResetClip(); //Reset clip earlier so client can simulate faster
+	FinishAnim();
+	PlayDown();
+	FinishAnim();
+	while ( (AmmoType.AmmoAmount > 0) && !bChangeWeapon && (ClipCount >= 20) )
+	{
+		Sleep(0.1);
+		if ( !isslave && (slavemag != None) ) //Main automag is out of ammo, fix!
+		{
+			FixClips();
+			slavemag.GotoState('Reloading');
+		}
+		else if ( isslave ) //Slave automag is out of ammo
+		{
+			MasterFixClip();
+		}
+	}
+	PlayAddClip();
+	FinishAnim();
+	if ( bChangeWeapon )
+		GotoState('DownWeapon');
+	else if ( Pawn(Owner).bFire!=0 )
+		Global.Fire(0);
+	else if ( Pawn(Owner).bAltFire!=0 )
+		Global.AltFire(0);	
+	else
+		GotoState('Idle');
+}
+
+simulated state ClientReloading
+{
+ignores Fire, AltFire, ClientFire, ClientAltFire, AnimEnd;
+	event BeginState()
+	{
+		bReloading = true;
+	}
+	event EndState()
+	{
+		bReloading = false;
+	}
+Begin:
+	PlayEjectClip();
+	FinishAnim();
+	PlayDown();
+	FinishAnim();
+	ResetClip();
+	while ( isslave && (ClientClipCount() >= 20) ) //Slave automag out of ammo, keep down
+	{
+		PlayAnim('Select',1.6,0.0);
+		AnimRate *= 0.01; //Keeps weapon frozen
+		sleep(0.1);
+	}
+	if ( !isslave && slavemag != None && (slavemag.ClientClipCount() < ClientClipCount()) )
+		slavemag.GotoState('ClientReloading');
+	PlayAddClip();
+	FinishAnim();
+	if ( Pawn(Owner).bFire != 0 )
+		Global.ClientFire(0);
+	else if ( Pawn(Owner).bAltFire != 0 )
+		Global.ClientAltFire(0);
+	if ( isslave )
+		PlayIdleAnim();
+	GotoState('');
+}
+
+
+//==========================================
 // NORMAL FIRE
 //============
 
@@ -407,6 +614,8 @@ simulated function PlayFiring()
 {
 	Owner.PlayOwnedSound(FireSound, SLOT_None,2.0*Pawn(Owner).SoundDampening);
 	PlayAnim('Shoot0',0.26, 0.04);	
+	if ( Level.NetMode == NM_Client )
+		FiredSinceUpdate++;
 }
 
 simulated function PlayFiringEnd()
@@ -435,8 +644,10 @@ Begin:
 	if ( slavemag != none )
 		SetTimer(0.20, false);
 	FinishAnim();
-	if (ClipCount>15)
+	if ( ClipCount>15 )
 		Owner.PlayOwnedSound(Misc1Sound, SLOT_None, 3.5*Pawn(Owner).SoundDampening);	
+	if ( (ClipCount >= 20) && (AmmoType.AmmoAmount > 0) )
+		GotoState('Reloading');
 	if ( (AmmoType.AmmoAmount <= 0) || ((Pawn(Owner).bFire == 0) && (Pawn(Owner).bAltFire == 0)) )
 	{
 		PlayFiringEnd();
@@ -472,6 +683,8 @@ state ClientFiring
 		}
 		else if ( !isslave && !bCanClientFire )
 			GotoState('');
+		else if ( ClientClipCount() >= 20 )
+			GotoState('ClientReloading');
 		else if ( Pawn(Owner).bFire != 0 )
 			Global.ClientFire(0);
 		else if ( Pawn(Owner).bAltFire != 0 )
@@ -500,7 +713,7 @@ state ClientFiring
 	simulated function EndState()
 	{
 		Super.EndState();
-		if ( slavemag != None )
+		if ( (slavemag != None) && !slavemag.bReloading )
 			slavemag.GotoState('');
 	}
 }
@@ -540,6 +753,8 @@ simulated function PlayAltRepeater()
 {
 	Owner.PlayOwnedSound(FireSound, SLOT_None,2.0*Pawn(Owner).SoundDampening);
 	PlayAnim('Shot2b', 0.4, 0.05);
+	if ( Level.NetMode == NM_Client )
+		FiredSinceUpdate++;
 }
 
 simulated function PlayAltRepeaterEnd()
@@ -578,6 +793,8 @@ Repeater:
 		AltAccuracy += 0.5;
 	if ( ClipCount > 15)
 		Owner.PlayOwnedSound(Misc1Sound, SLOT_None, 3.5*Pawn(Owner).SoundDampening);		
+	if ( (ClipCount >= 20) && (AmmoType.AmmoAmount > 0) )
+		GotoState('Reloading');
 
 	if ( isslave )
 	{
@@ -630,7 +847,9 @@ state ClientAltFiring
 		else if ( AnimSequence == 'Shot2b' )
 		{
 			//Simulate reload here
-			if ( (AmmoType.AmmoAmount <= 0) || Pawn(Owner).bAltFire == 0 )
+			if ( ClientClipCount() >= 20 )
+				GotoState('ClientReloading');
+			else if ( (AmmoType.AmmoAmount <= 0) || Pawn(Owner).bAltFire == 0 )
 				PlayAltRepeaterEnd();
 			else
 				PlayAltRepeater();
@@ -668,12 +887,15 @@ state ClientAltFiring
 	simulated function EndState()
 	{
 		Super.EndState();
-		if ( slavemag != None )
+		if ( (slavemag != None) && !slavemag.bReloading )
 			slavemag.GotoState('');
 	}
 }
 
 
+//==========================================
+// BRINGING UP
+//============
 state Active
 {
 	function bool PutDown()
@@ -698,6 +920,7 @@ state Active
 
 Begin:
 	FinishAnim();
+	PlayPostSelect();
 	if ( bChangeWeapon )
 		GotoState('DownWeapon');
 	bWeaponUp = True;
