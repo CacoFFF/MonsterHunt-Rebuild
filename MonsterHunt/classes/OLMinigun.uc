@@ -184,18 +184,43 @@ state ClientFinish
 	}
 }
 
-state ClientAltFiring
+state ClientFiring
+{
+	simulated event AnimEnd()
+	{
+		if ( (AnimSequence == 'Shoot1') && (Pawn(Owner).bFire + Pawn(Owner).bAltFire == 0) )
+		{
+			PlayUnwind();
+			AmbientSound = None;
+		}
+		else
+			Super.AnimEnd();
+	}
+}
+
+simulated state ClientAltFiring
 {
 	simulated function BeginState()
 	{
 		bSteadyFlash3rd = true;
 		AmbientSound = FireSound;
+		SetTimer( 0.13, true); //Fire rate on normal fire
 	}
 
 	simulated function EndState()
 	{
 		bSteadyFlash3rd = false;
+		SetTimer( 0, false);
 		Super.EndState();
+	}
+	
+	simulated event Timer()
+	{
+		if ( AnimSequence == 'Shoot2' ) //Change to alt-fire rate
+			TimerRate = 0.08;
+		//Force quick unwind after release
+		if ( Pawn(Owner).bAltFire == 0 )
+			AnimEnd();
 	}
 	
 	simulated function AnimEnd()

@@ -7,6 +7,13 @@ var name PriorityName;
 //Time to complete is 30/frames
 //PlayAnimRate in PlayAnim is a multiplier to the above
 
+//Keep net compatibility
+replication
+{
+	reliable if ( Role < ROLE_Authority )
+		StopReload, Reload;
+}
+
 function SetSwitchPriority(pawn Other)
 {
 	local int i;
@@ -47,6 +54,8 @@ function SetSwitchPriority(pawn Other)
 	}		
 }
 
+function Reload();
+function StopReload();
 
 defaultproperties
 {
