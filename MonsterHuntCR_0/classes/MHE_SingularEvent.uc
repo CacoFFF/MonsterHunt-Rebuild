@@ -12,7 +12,9 @@ var(Debug) bool bTriggersPawn;
 var(Debug) bool bTriggersFactory;
 var(Debug) bool bTogglesTriggers;
 var(Debug) bool bModifiesTriggers; //Important
+var(Debug) bool bUnlocksAttractor; //MHE_SingularEvent chainer
 var(Debug) bool bMultiHit;
+var(Debug) bool bShoot;
 var(Debug) string EventChain;
 
 //Trigger: bTriggerOnceOnly
@@ -34,6 +36,11 @@ function RegisterMechanism( Actor Other)
 
 function SetAttraction();
 function BuildEventList();
+
+function bool ShouldAttractBots()
+{
+	return (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers || bUnlocksAttractor);
+}
 
 state TriggerState
 {
@@ -72,7 +79,7 @@ state TriggerState
 		if ( T == None || T.bDeleteMe || !T.bCollideActors )
 			Destroy();
 		bReady = T.bInitiallyactive && ((T.ReTriggerDelay <= 0) || (Level.TimeSeconds - T.TriggerTime >= T.ReTriggerDelay));
-		bAttractBots = (DeferTo != None) && bReady && (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers);
+		bAttractBots = (DeferTo != None) && bReady && ShouldAttractBots();
 	}
 	
 	function name RequiredEvent()
@@ -104,6 +111,8 @@ state TriggerState
 		else //The trigger has been touched
 		{
 			bRecheckEvents = true;
+			if ( bAttractBots && !bCompleted && !NearbyMonsterWP() )
+				IncreaseObjectiveCounter( EventInstigator);
 			bCompleted = !MarkedMechanism.bCollideActors;
 		}
 		SetAttraction();
@@ -162,7 +171,7 @@ state ButtonState
 		
 		M = Mover(MarkedMechanism);
 		bCompleted = (bCompleted && !bMultiHit) || (!M.bInterpolating && (M.KeyNum == M.NumKeys-1)); //Set completed just in case
-		bAttractBots = (DeferTo != None) && !bCompleted && (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers);
+		bAttractBots = (DeferTo != None) && !bCompleted && ShouldAttractBots();
 	}
 
 	//The button has finished interpolating
@@ -172,6 +181,8 @@ state ButtonState
 		{
 			if ( !bDiscovered )
 				Discover();
+			if ( bAttractBots && !bCompleted && !NearbyMonsterWP() )
+				IncreaseObjectiveCounter( EventInstigator);
 			bCompleted = true;
 			SetAttraction();
 			bRecheckEvents = true;
@@ -212,7 +223,7 @@ function ResetEvents()
 
 function ClearIfUseless()
 {
-	if ( !bMultiHit || bTriggersMover || bUnlocksStructure || bTriggersCounter || bTriggersPawn || bTriggersFactory || bUnlocksRoutes )
+	if ( !bMultiHit || bTriggersMover || bUnlocksStructure || bTriggersCounter || bTriggersPawn || bTriggersFactory || bUnlocksRoutes || bUnlocksAttractor )
 		return;
 	Destroy();
 }
@@ -244,10 +255,38 @@ function AnalyzeEvent( name aEvent)
 				}
 			}
 		}
-		else if ( A.IsA('Counter') )
+		else if ( A.IsA('Triggers') )
 		{
-			if ( Counter(A).NumToCount > 0 )
-				bTriggersCounter = true;
+			if ( A.IsA('Counter') )
+			{
+				if ( Counter(A).NumToCount > 0 )
+					bTriggersCounter = true;
+			}
+			else if ( A.IsA('Dispatcher') )
+			{
+				For ( i=0 ; i<8 ; i++ )
+					AnalyzeEvent( Dispatcher(A).OutEvents[i] );
+			}
+			else if ( A.IsA('Trigger') )
+			{
+				if ( A.bCollideActors )
+				{
+					if ( A.IsInState('TriggerToggle') )
+					{
+						bTogglesTriggers = true;
+						if ( Trigger(A).bTriggerOnceOnly )
+							bModifiesTriggers = true;
+					}
+					else if ( (A.IsInState('OtherTriggerTurnsOn') && !Trigger(A).bInitiallyActive)
+							|| (A.IsInState('OtherTriggerTurnsOff') && Trigger(A).bInitiallyActive) )
+						bModifiesTriggers = true;
+				}
+			}
+			else if ( A.IsA('MHE_SingularEvent') && (A != self) ) //Detect chained doors
+			{
+				if ( MHE_SingularEvent(A).ShouldAttractBots() || MHE_SingularEvent(A).bTriggersMover )
+					bUnlocksAttractor = true;
+			}
 		}
 		else if ( A.bIsPawn )
 		{
@@ -263,21 +302,9 @@ function AnalyzeEvent( name aEvent)
 			if ( (BlockedPath(A) == None) || (BlockedPath(A).ExtraCost > 0) )
 				bUnlocksRoutes = true;
 		}
-		else if ( A.IsA('Dispatcher') )
+		else if ( A.IsA('ExplodingWall') )
 		{
-			For ( i=0 ; i<8 ; i++ )
-				AnalyzeEvent( Dispatcher(A).OutEvents[i] );
-		}
-		else if ( A.IsA('Trigger') )
-		{
-			if ( A.bCollideActors )
-			{
-				if ( A.IsInState('TriggerToggle') )
-					bTogglesTriggers = true;
-				else if ( (A.IsInState('OtherTriggerTurnsOn') && !Trigger(A).bInitiallyActive)
-						|| (A.IsInState('OtherTriggerTurnsOff') && Trigger(A).bInitiallyActive) )
-					bModifiesTriggers = true;
-			}
+			AnalyzeEvent( A.Event);
 		}
 	}
 	AnalyzeDepth--;
@@ -312,6 +339,15 @@ event Timer()
 			}
 	}
 }
+
+function bool NearbyMonsterWP()
+{
+	local Triggers TT;
+	ForEach RadiusActors( class'Triggers', TT, 200)
+		if ( TT.IsA('MonsterWaypoint') && MHS.static.ActorsTouching( self, TT, 10, 10) )
+			return true;
+}
+
 
 defaultproperties
 {

@@ -116,8 +116,6 @@ function FindDeferPoint( Actor DeferFor)
 }
 
 
-
-
 event PostBeginPlay()
 {
 	if ( MonsterBriefing(Owner) != None )
@@ -144,6 +142,20 @@ event GainedChild( Actor Other)
 {
 	if ( MHI_Base(Other) != None )
 		MHI_Base(Other).Briefing = Briefing;
+}
+
+
+function IncreaseObjectiveCounter( Pawn Other)
+{
+	local MonsterPlayerData MPD;
+	
+	if ( Other == None || Other.PlayerReplicationInfo == None )
+		return;
+	MPD = Briefing.GetPlayerData( Other.PlayerReplicationInfo.PlayerID);
+	if ( MPD != None )
+	{
+		MPD.ObjectivesTaken++;
+	}
 }
 
 

@@ -450,6 +450,28 @@ function SetPawnDifficulty( int Diff, ScriptedPawn S)
 
 }
 
+function byte AssessBotAttitude(Bot aBot, Pawn Other)
+{
+	local ScriptedPawn S;
+
+	S = ScriptedPawn(Other);
+	if ( S != None )
+	{
+		if ( S.AttitudeToPlayer >= ATTITUDE_Friendly )
+			return 3;
+		if ( S.AttitudeToPlayer == ATTITUDE_Ignore )
+			return 2;
+		if ( S.IsA('Nali') || S.IsA('Cow') )
+		{
+			if ( S.AlarmTag != '' )
+				return 3;
+			if ( S.AttitudeToPlayer == ATTITUDE_Fear )
+				return 2;
+		}
+	}
+	return Super.AssessBotAttitude( aBot, Other);
+}
+
 function TaskMonstersVsBot( Bot aBot)
 {
 	local ScriptedPawn S;
@@ -604,8 +626,7 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 			if ( Dist > 1500 )
 				break;
 			//Attraction point is nearby, send bot instead of altering objective
-			if ( ((Dist < 200) && Other.FastTrace(Events[i].Location))
-			|| ( AttractTo(Other,Events[i],true) && (Other.MoveTarget == Events[i]) ) )
+			if ( Other.PointReachable(Events[i].Location) || ( AttractTo(Other,Events[i],true) && (Other.MoveTarget == Events[i]) ) )
 			{
 				Other.MoveTarget = Events[i];
 				return false;

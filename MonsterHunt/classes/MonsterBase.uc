@@ -136,6 +136,8 @@ function bool CheckReplacement( Actor Other, out byte bSuperRelevant)
 				return True;
 			if ( Other.IsA('SCUBAGear') ) //Auto-activate scuba underwater only
 				SCUBAGear(Other).bAutoActivate = Other.Region.Zone.bWaterZone;
+			if ( Other.IsA('Seeds') ) //Seeds should not respawn
+				Seeds(Other).RespawnTime = 0;
 		}
 	}
 	bSuperRelevant = 0;
