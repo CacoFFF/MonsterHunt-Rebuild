@@ -10,6 +10,7 @@ var Pickup Amp;
 var Sound PowerUpSound;
 var name ShootAnims[5];
 var bool bDeathMatch;
+var bool bCheckAmp;
 var class<DispersionAmmo> DProjectiles[5];
 
 replication
@@ -27,10 +28,8 @@ function float RateSelf( out int bUseAltMode )
 	local float rating;
 	local Pawn Enemy;
 
-	if ( Amp != None )
-		rating = 6 * AIRating;
-	else 
-		rating = AIRating;
+	if ( HasAmplifier() )	rating = 6 * AIRating;
+	else 					rating = AIRating;
 
 	if ( AmmoType.AmmoAmount <=0 )
 		return 0.05;
@@ -52,8 +51,28 @@ function float SuggestAttackStyle()
 	return -0.3;
 }
 
+function Inventory SpawnCopy( pawn Other )
+{
+	local Inventory Copy;
+
+	Copy = Super.SpawnCopy(Other);
+	OLDPistol(Copy).Amp = Amplifier( Other.FindInventoryType(class'Amplifier'));
+	return Copy;
+}
+
+function bool HasAmplifier()
+{
+	if ( bCheckAmp )
+	{
+		Amp = Amplifier( Pawn(Owner).FindInventoryType(class'Amplifier'));
+		bCheckAmp = false;
+	}
+	return (Amp != None) && !Amp.bDeleteMe;
+}
+
 function bool HandlePickupQuery( inventory Item )
 {
+	local bool Result;
 	if ( Item.IsA('WeaponPowerup') )
 	{ 
 		AmmoType.AddAmmo(AmmoType.MaxAmmo);
@@ -82,8 +101,11 @@ function bool HandlePickupQuery( inventory Item )
 		Item.SetRespawn();
 		return true;
 	}
-	else
-		return Super.HandlePickupQuery(Item);
+
+	Result = Super.HandlePickupQuery(Item);
+	if ( !Result && (Amplifier(Item) != None) )
+		bCheckAmp = true;
+	return Result;
 }
 
 function BecomePickup()
@@ -135,10 +157,8 @@ function Projectile ProjectileFire(class<projectile> ProjClass, float ProjSpeed,
 
 	Owner.MakeNoise(Pawn(Owner).SoundDampening);
 	
-	if (Amp!=None)
-		Mult = Amp.UseCharge(80);
-	else
-		Mult = 1.0;
+	if (HasAmplifier())	Mult = Amp.UseCharge(80);
+	else				Mult = 1.0;
 	
 	GetAxes(Pawn(owner).ViewRotation,X,Y,Z);
 	Start = Owner.Location + CalcDrawOffset() + FireOffset.X * X + FireOffset.Y * Y + FireOffset.Z * Z; 
@@ -273,10 +293,8 @@ ignores fire, altfire;
 		local Vector Start, X,Y,Z;
 		local float Mult;
 		
-		if (Amp!=None)
-			Mult = Amp.UseCharge(ChargeSize*50+50);
-		else
-			Mult=1.0;
+		if (HasAmplifier())	Mult = Amp.UseCharge(ChargeSize*50+50);
+		else				Mult=1.0;
 		
 		Owner.PlayOwnedSound(AltFireSound, SLOT_Misc, 1.8*Pawn(Owner).SoundDampening);
 		if ( PlayerPawn(Owner) != None )

@@ -4,6 +4,7 @@ var() int hitdamage;
 var Pickup Amp;
 var Projectile Tracked;
 var bool bBotSpecialMove;
+var bool bCheckAmp;
 var float TapTime;
 
 
@@ -14,6 +15,26 @@ function Inventory SpawnCopy( pawn Other )
 	Copy = Super.SpawnCopy(Other);
 	OLASMD(Copy).Amp = Amplifier( Other.FindInventoryType(class'Amplifier'));
 	return Copy;
+}
+
+function bool HandlePickupQuery( inventory Item )
+{
+	local bool Result;
+	
+	Result = Super.HandlePickupQuery( Item);
+	if ( !Result && (Amplifier(Item) != None) )
+		bCheckAmp = true;
+	return Result;
+}
+
+function bool HasAmplifier()
+{
+	if ( bCheckAmp )
+	{
+		Amp = Amplifier( Pawn(Owner).FindInventoryType(class'Amplifier'));
+		bCheckAmp = false;
+	}
+	return (Amp != None) && !Amp.bDeleteMe;
 }
 
 function AltFire( float Value )
@@ -91,7 +112,7 @@ function float RateSelf( out int bUseAltMode )
 	if ( AmmoType.AmmoAmount <=0 )
 		return -2;
 		
-	rating = ( 1 + int(Amp!=None) ) * AIRating;
+	rating = ( 1 + int(HasAmplifier()) ) * AIRating;
 
 	P = Pawn(Owner);
 	bNovice = ( (Bot(Owner) == None) || Bot(Owner).bNovice );
@@ -197,8 +218,8 @@ function Projectile ProjectileFire(class<projectile> ProjClass, float ProjSpeed,
 	local Vector Start, X,Y,Z;
 	local float Mult;
 
-	if (Amp!=None)	Mult = Amp.UseCharge(80);
-	else			Mult = 1.0;
+	if (HasAmplifier())	Mult = Amp.UseCharge(80);
+	else				Mult = 1.0;
 
 	Owner.MakeNoise(Pawn(Owner).SoundDampening);
 	GetAxes(Pawn(owner).ViewRotation,X,Y,Z);
@@ -225,8 +246,8 @@ function ProcessTraceHit(Actor Other, Vector HitLocation, Vector HitNormal, Vect
 		HitLocation = Owner.Location + X*10000.0;
 	}
 
-	if (Amp!=None)	Mult = Amp.UseCharge(100);
-	else			Mult = 1.0;
+	if (HasAmplifier())	Mult = Amp.UseCharge(100);
+	else				Mult = 1.0;
 	SmokeLocation = Owner.Location + CalcDrawOffset() + FireOffset.X * X + FireOffset.Y * 3.3 * Y + FireOffset.Z * Z * 3.0;
 	DVector = HitLocation - SmokeLocation;
 	NumPoints = VSize(DVector)/70.0;
