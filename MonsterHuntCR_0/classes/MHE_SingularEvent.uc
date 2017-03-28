@@ -212,12 +212,13 @@ function ResetEvents()
 {
 	bTriggersMover = false;
 	bUnlocksStructure = false;
+	bUnlocksRoutes = false;
 	bTriggersCounter = false;
 	bTriggersPawn = false;
 	bTriggersFactory = false;
-	bUnlocksRoutes = false;
 	bTogglesTriggers = false;
 	bModifiesTriggers = false;
+	bUnlocksAttractor = false;
 	EventChain = ";";
 }
 
@@ -282,11 +283,11 @@ function AnalyzeEvent( name aEvent)
 						bModifiesTriggers = true;
 				}
 			}
-			else if ( A.IsA('MHE_SingularEvent') && (A != self) ) //Detect chained doors
+/*			else if ( A.IsA('MHE_SingularEvent') && (A != self) ) //Detect chained doors
 			{
 				if ( MHE_SingularEvent(A).ShouldAttractBots() || MHE_SingularEvent(A).bTriggersMover )
 					bUnlocksAttractor = true;
-			}
+			}*/ //WAS BUGGED, TEST AGAIN LATER
 		}
 		else if ( A.bIsPawn )
 		{
