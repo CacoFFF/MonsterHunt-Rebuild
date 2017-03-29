@@ -43,6 +43,8 @@ function PostInit()
 
 function bool CausesEvent( name aEvent);
 function name RequiredEvent(); //If this MHE_Base needs to be enabled, provide a tag
+function RequiredForEvent(); //Somebody needs to activate this MHE_Base in order to activate an event
+
 
 function bool ShouldDefer( Pawn Other)
 {
@@ -108,6 +110,18 @@ function FindDeferPoint( Actor DeferFor)
 					Best = N;
 					BestWeight = Weight;
 				}
+			}
+		}
+	}
+	if ( DeferToMode == DTM_Nearest )
+	{
+		ForEach RadiusActors( class'NavigationPoint', N, 1500)
+		{
+			Weight = 1000 + 500*int(N.IsA('MonsterTriggerMarker')) - VSize( (N.Location - Location) * vect(1,1,4) );
+			if ( (Weight > BestWeight) && (N.UpstreamPaths[0] != -1) )
+			{	//Make sure trace reaches this actor or DeferFor
+				Best = N;
+				BestWeight = Weight;
 			}
 		}
 	}

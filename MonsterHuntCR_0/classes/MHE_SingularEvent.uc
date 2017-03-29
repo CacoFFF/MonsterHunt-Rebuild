@@ -13,6 +13,7 @@ var(Debug) bool bTriggersFactory;
 var(Debug) bool bTogglesTriggers;
 var(Debug) bool bModifiesTriggers; //Important
 var(Debug) bool bUnlocksAttractor; //MHE_SingularEvent chainer
+var(Debug) bool bQueriedByBot; //Temporarily enable attraction
 var(Debug) bool bMultiHit;
 var(Debug) bool bShoot;
 var(Debug) string EventChain;
@@ -34,12 +35,25 @@ function RegisterMechanism( Actor Other)
 		GotoState('ButtonState');
 }
 
+//Somebody needs to activate this MHE_Base in order to activate an event
+function RequiredForEvent()
+{
+	bQueriedByBot = true;
+	bAttractBots = true;
+	if ( (DeferTo == None) && (MarkedMechanism != None) ) //Force find defer point
+	{
+		DeferToMode = DTM_Nearest; //Defer to ANYTHING nearby
+		FindDeferPoint( MarkedMechanism);
+	}
+}
+
+
 function SetAttraction();
 function BuildEventList();
 
 function bool ShouldAttractBots()
 {
-	return (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers || bUnlocksAttractor);
+	return (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers || bUnlocksAttractor || bQueriedByBot);
 }
 
 state TriggerState
@@ -115,6 +129,7 @@ state TriggerState
 				IncreaseObjectiveCounter( EventInstigator);
 			bCompleted = !MarkedMechanism.bCollideActors;
 		}
+		bQueriedByBot = false; //Hit!
 		SetAttraction();
 	}
 }
@@ -184,6 +199,7 @@ state ButtonState
 			if ( bAttractBots && !bCompleted && !NearbyMonsterWP() )
 				IncreaseObjectiveCounter( EventInstigator);
 			bCompleted = true;
+			bQueriedByBot = false; //Hit!
 			SetAttraction();
 			bRecheckEvents = true;
 			if ( !bMultiHit )
@@ -251,8 +267,8 @@ function AnalyzeEvent( name aEvent)
 				if ( !M.bInterpolating && (M.KeyNum == 0) )
 				{
 					AnalyzeEvent( M.Event); //Identify this Mover's event as caused by self
-					if ( M.bTriggerOnceOnly || (M.StayOpenTime > 9999) )
-						bUnlocksStructure = true;
+					if ( !M.IsInState('TriggerToggle') && (M.bTriggerOnceOnly || (M.StayOpenTime > 9999)) )
+						bUnlocksStructure = true; //TriggerToggle ignores bTriggerOnceOnly!!!
 				}
 			}
 		}

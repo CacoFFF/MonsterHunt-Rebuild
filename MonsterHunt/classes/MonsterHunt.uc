@@ -572,11 +572,12 @@ function Name EvaluateNextNodeDoor( Pawn Other)
 	ForEach Other.TraceActors( class'Actor', A, HitLocation, HitNormal, NextPath.Location)
 		if ( A.IsA('Mover') && (InStr( string(A.InitialState),"Trigger") != -1) && !Mover(A).bInterpolating && !Mover(A).bDelaying && (Mover(A).SavedTrigger == None) )
 		{
-			ForEach Other.TraceActors( class'Actor', B, HitLocation, HitNormal, HitLocation+HitNormal, Other.Location, vect(17,17,39) )
+			//Detect active trigger via trace //BIG EXTENT TO EASE DETECTION
+			ForEach Other.TraceActors( class'Actor', B, HitLocation, HitNormal, HitLocation+HitNormal*Other.CollisionRadius, Other.Location, vect(40,40,70) ) 
 				if ( B.Event == A.Tag )
 				{
 					if ( (Trigger(B) != None) && !Trigger(B).bInitiallyActive )
-						return B.Tag;
+						break;
 					return '';
 				}
 			return A.Tag;
@@ -637,10 +638,13 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 	FVPB = Briefing.GetPathBlocker( RequiredEvent);
 	if		( BlockType == 1 )	FVPB.SetupBlock( NextPath, RequiredEvent);
 	else if	( BlockType == 2 )	FVPB.SetupTeleporter( Teleporter(NextPath) );
+	//Notify MHE_Base we're becoming an objective, allows MHE_Base to self-modify
+	For ( i=0 ; i<iE ; i++ )
+		Events[i].RequiredForEvent();
 	For ( i=0 ; i<iE ; i++ ) //bCompleted check already done
 		if ( Events[i].bAttractBots && (Events[i].DeferTo != None) )
 		{
-			if ( !Events[i].ShouldDefer( Other) )
+			if ( !Events[i].ShouldDefer( Other) ) //Direct attraction
 			{
 				Other.MoveTarget = Events[i];
 				return false;
