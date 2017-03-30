@@ -158,10 +158,15 @@ event Timer()
 		SavedName = PRI.PlayerName;
 		SetTimer( Level.TimeDilation * FRand(), False);
 		Health = Max(0,Pawn(PRI.Owner).Health);
-		Armor = 0;
-		For ( Inv=PRI.Owner.Inventory ; Inv!=None ; Inv=Inv.Inventory )
-			if ( Inv.bIsAnArmor )
-				Armor += Inv.Charge;
+		if ( PRI.bWaitingPlayer && PlayerPawn(PRI.Owner) != None && !PlayerPawn(PRI.Owner).bReadyToPlay && DeathMatchPlus(Level.Game).bTournament )
+			Armor = -1;  //Hax
+		else
+		{
+			Armor = 0;
+			For ( Inv=PRI.Owner.Inventory ; Inv!=None ; Inv=Inv.Inventory )
+				if ( Inv.bIsAnArmor )
+					Armor += Inv.Charge;
+		}
 	}
 }
 

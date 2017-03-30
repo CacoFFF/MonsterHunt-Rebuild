@@ -92,6 +92,7 @@ final function int GetCycles_XC()
 
 final function string AlignToRight( int Align)
 {
+	if ( Align < 0 )	return "  0";
 	if ( Align < 10 )	return "  "$string(Align);
 	if ( Align < 100 )	return " "$string(Align);
 	return string(Align);
@@ -151,7 +152,6 @@ function ShowScores(Canvas Canvas)
 	////////
 	Canvas.bNoSmooth = False;
 	Canvas.DrawColor = White;
-	//Canvas.Style = ERenderStyle.STY_Translucent;
 	Canvas.Style = ERenderStyle.STY_Modulated;
 	Canvas.SetPos( X, Y );
 	Canvas.DrawRect( texture'shade2', tableWidth , tableHeaderHeight + cellHeight * ruX );
@@ -161,8 +161,6 @@ function ShowScores(Canvas Canvas)
 	Canvas.SetPos( X, Y );
 	if ( getHeaderTexture[i] != none )
 		Canvas.DrawPattern( getHeaderTexture[i], tableWidth , tableHeaderHeight , 1 );*/
-
-	//Header core icons
 
 	if ( (HunterTeam != none) && (HunterTeam.TeamName != "") )
 		s = HunterTeam.TeamName;
@@ -239,9 +237,9 @@ function ShowScores(Canvas Canvas)
 		Canvas.DrawColor = White;
 		Canvas.Style = ERenderStyle.STY_Translucent;
 		Canvas.SetPos( X+5,Y+5);
-/*		if ( (aPRI != none) && aPRI.bReadyToPlay )
-			Canvas.DrawIcon( Texture'IconCoreGreen', 0.5);
-		else*/ if( aPRI.TalkTexture != None )
+		if ( (aMPD != none) && (aMPD.Armor == -1) )
+			Canvas.DrawIcon( Texture'Botpack.Icons.I_TeamG', 0.5);
+		else if( aPRI.TalkTexture != None )
 			Canvas.DrawIcon( aPRI.TalkTexture, 0.5 * 64.0 / aPRI.TalkTexture.VSize );
 		else
 			Canvas.DrawIcon( Texture'shade', 1 );	  
