@@ -1020,6 +1020,13 @@ function CountHunters_XC()
 //MonsterEnd chainer
 function RegisterEnd( MonsterEnd Other)
 {
+	local MonsterEnd ME;
+	
+	//Sanity check, MJD_FIX somehow needs this
+	For ( ME=EndList ; ME!=None ; ME=ME.NextEnd )
+		if ( ME == Other )
+			return;
+	
 	Other.NextEnd = EndList;
 	EndList = Other;
 }

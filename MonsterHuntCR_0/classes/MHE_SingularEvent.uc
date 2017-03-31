@@ -52,10 +52,6 @@ function RequiredForEvent()
 function SetAttraction();
 function BuildEventList();
 
-function bool ShouldAttractBots()
-{
-	return (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers || bUnlocksAttractor || bQueriedByBot);
-}
 
 state TriggerState
 {
@@ -225,6 +221,11 @@ final function AddEvent( name aEvent)
 	EventChain = EventChain $ string(aEvent) $ ";";
 }
 
+function bool ShouldAttractBots()
+{
+	return (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers || bUnlocksAttractor || bQueriedByBot);
+}
+
 function ResetEvents()
 {
 	bTriggersMover = false;
@@ -243,6 +244,8 @@ function ResetEvents()
 function ClearIfUseless()
 {
 	if ( !bMultiHit || ShouldAttractBots() || bTriggersMover || bTriggersPawn || bTriggersFactory )
+		return;
+	if ( RequiredEvent() != '' )
 		return;
 	Destroy();
 }
