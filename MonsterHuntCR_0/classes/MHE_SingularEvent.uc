@@ -5,6 +5,7 @@ var(Debug) Actor MarkedMechanism;
 var int AnalyzeDepth;
 var bool bRecheckEvents;
 var(Debug) bool bTriggersMover;
+var(Debug) bool bSimpleDoorTrigger;
 var(Debug) bool bUnlocksStructure;
 var(Debug) bool bUnlocksRoutes;
 var(Debug) bool bTriggersCounter;
@@ -227,6 +228,7 @@ final function AddEvent( name aEvent)
 function ResetEvents()
 {
 	bTriggersMover = false;
+	bSimpleDoorTrigger = false;
 	bUnlocksStructure = false;
 	bUnlocksRoutes = false;
 	bTriggersCounter = false;
@@ -240,7 +242,7 @@ function ResetEvents()
 
 function ClearIfUseless()
 {
-	if ( !bMultiHit || bTriggersMover || bUnlocksStructure || bTriggersCounter || bTriggersPawn || bTriggersFactory || bUnlocksRoutes || bUnlocksAttractor )
+	if ( !bMultiHit || ShouldAttractBots() || bTriggersMover || bTriggersPawn || bTriggersFactory )
 		return;
 	Destroy();
 }
@@ -262,7 +264,10 @@ function AnalyzeEvent( name aEvent)
 		{
 			if ( InStr( A.GetStateName(),"Trigger") != -1 ) 
 			{
-				bTriggersMover = true;
+				if ( VSize( A.Location - Location) < 600 )
+					bSimpleDoorTrigger = true;
+				else
+					bTriggersMover = true;
 				M = Mover(A);
 				if ( !M.bInterpolating && (M.KeyNum == 0) )
 				{

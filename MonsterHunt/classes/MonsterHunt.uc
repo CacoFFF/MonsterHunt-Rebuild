@@ -607,6 +607,10 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 	//Prepare a list of available events (direct triggers and chained triggers)
 	Briefing.EnumerateTriggers( RequiredEvent, Events, iE);
 	
+	//Don't block aggresively
+	if ( iE == 0 )
+		return false;
+	
 	//Sort by distance
 	For ( i=1 ; i<iE ; i++ )
 		if ( VSize(Events[i].Location-Other.Location) < VSize(Events[i-1].Location-Other.Location) )

@@ -112,6 +112,18 @@ function FindDeferPoint( Actor DeferFor)
 				}
 			}
 		}
+		if ( Best == None ) //Force onto MonsterTriggerMarker actor even if not visible
+		{
+			ForEach RadiusActors( class'NavigationPoint', N, 500)
+			{
+				Weight = 150 + 350*int(N.IsA('MonsterTriggerMarker')) - VSize( (N.Location - Location) * vect(1,1,4) );
+				if ( (Weight > BestWeight) && (N.UpstreamPaths[0] != -1) )
+				{	//Make sure trace reaches this actor or DeferFor
+					Best = N;
+					BestWeight = Weight;
+				}
+			}
+		}
 	}
 	if ( DeferToMode == DTM_Nearest )
 	{
