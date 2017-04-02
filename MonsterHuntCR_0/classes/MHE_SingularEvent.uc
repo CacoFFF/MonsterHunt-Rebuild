@@ -2,22 +2,10 @@
 class MHE_SingularEvent expands MHE_Base;
 
 var(Debug) Actor MarkedMechanism;
-var int AnalyzeDepth;
 var bool bRecheckEvents;
-var(Debug) bool bTriggersMover;
-var(Debug) bool bSimpleDoorTrigger;
-var(Debug) bool bUnlocksStructure;
-var(Debug) bool bUnlocksRoutes;
-var(Debug) bool bTriggersCounter;
-var(Debug) bool bTriggersPawn;
-var(Debug) bool bTriggersFactory;
-var(Debug) bool bTogglesTriggers;
-var(Debug) bool bModifiesTriggers; //Important
-var(Debug) bool bUnlocksAttractor; //MHE_SingularEvent chainer
 var(Debug) bool bQueriedByBot; //Temporarily enable attraction
 var(Debug) bool bMultiHit;
 var(Debug) bool bShoot;
-var(Debug) string EventChain;
 
 //Trigger: bTriggerOnceOnly
 //Mover (BumpOpenTimed/BumpButton): bTriggerOnceOnly || StayOpenTime > 9999
@@ -205,42 +193,6 @@ state ButtonState
 	}
 }
 
-
-function bool CausesEvent( name aEvent)
-{
-	return HasEvent( aEvent);
-}
-
-final function bool HasEvent( name aEvent)
-{
-	return InStr( EventChain, ";"$aEvent$";") != -1;
-}
-
-final function AddEvent( name aEvent)
-{
-	EventChain = EventChain $ string(aEvent) $ ";";
-}
-
-function bool ShouldAttractBots()
-{
-	return (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers || bUnlocksAttractor || bQueriedByBot);
-}
-
-function ResetEvents()
-{
-	bTriggersMover = false;
-	bSimpleDoorTrigger = false;
-	bUnlocksStructure = false;
-	bUnlocksRoutes = false;
-	bTriggersCounter = false;
-	bTriggersPawn = false;
-	bTriggersFactory = false;
-	bTogglesTriggers = false;
-	bModifiesTriggers = false;
-	bUnlocksAttractor = false;
-	EventChain = ";";
-}
-
 function ClearIfUseless()
 {
 	if ( !bMultiHit || ShouldAttractBots() || bTriggersMover || bTriggersPawn || bTriggersFactory )
@@ -250,90 +202,7 @@ function ClearIfUseless()
 	Destroy();
 }
 
-function AnalyzeEvent( name aEvent)
-{
-	local Actor A;
-	local Mover M;
-	local int i;
-	//Avoid registering the mechanism's tag if possible
-	if ( aEvent == '' || aEvent == 'None' || aEvent == Tag || (AnalyzeDepth > 20) || HasEvent(aEvent) )
-		return;
-	AddEvent(aEvent);
-	
-	AnalyzeDepth++;
-	ForEach AllActors( class'Actor', A, aEvent)
-	{
-		if ( A.IsA('Mover') )
-		{
-			if ( InStr( A.GetStateName(),"Trigger") != -1 ) 
-			{
-				if ( VSize( A.Location - Location) < 600 )
-					bSimpleDoorTrigger = true;
-				else
-					bTriggersMover = true;
-				M = Mover(A);
-				if ( !M.bInterpolating && (M.KeyNum == 0) )
-				{
-					AnalyzeEvent( M.Event); //Identify this Mover's event as caused by self
-					if ( !M.IsInState('TriggerToggle') && (M.bTriggerOnceOnly || (M.StayOpenTime > 9999)) )
-						bUnlocksStructure = true; //TriggerToggle ignores bTriggerOnceOnly!!!
-				}
-			}
-		}
-		else if ( A.IsA('Triggers') )
-		{
-			if ( A.IsA('Counter') )
-			{
-				if ( Counter(A).NumToCount > 0 )
-					bTriggersCounter = true;
-			}
-			else if ( A.IsA('Dispatcher') )
-			{
-				For ( i=0 ; i<8 ; i++ )
-					AnalyzeEvent( Dispatcher(A).OutEvents[i] );
-			}
-			else if ( A.IsA('Trigger') )
-			{
-				if ( A.bCollideActors )
-				{
-					if ( A.IsInState('TriggerToggle') )
-					{
-						bTogglesTriggers = true;
-						if ( Trigger(A).bTriggerOnceOnly )
-							bModifiesTriggers = true;
-					}
-					else if ( (A.IsInState('OtherTriggerTurnsOn') && !Trigger(A).bInitiallyActive)
-							|| (A.IsInState('OtherTriggerTurnsOff') && Trigger(A).bInitiallyActive) )
-						bModifiesTriggers = true;
-				}
-			}
-/*			else if ( A.IsA('MHE_SingularEvent') && (A != self) ) //Detect chained doors
-			{
-				if ( MHE_SingularEvent(A).ShouldAttractBots() || MHE_SingularEvent(A).bTriggersMover )
-					bUnlocksAttractor = true;
-			}*/ //WAS BUGGED, TEST AGAIN LATER
-		}
-		else if ( A.bIsPawn )
-		{
-			bTriggersPawn = true;
-		}
-		else if ( A.IsA('ThingFactory') )
-		{
-			if ( ThingFactorY(A).Capacity > 0 )
-				bTriggersFactory = true;
-		}
-		else if ( A.IsA('NavigationPoint') )
-		{
-			if ( (BlockedPath(A) == None) || (BlockedPath(A).ExtraCost > 0) )
-				bUnlocksRoutes = true;
-		}
-		else if ( A.IsA('ExplodingWall') )
-		{
-			AnalyzeEvent( A.Event);
-		}
-	}
-	AnalyzeDepth--;
-}
+
 
 event Timer()
 {
@@ -363,14 +232,6 @@ event Timer()
 				return;
 			}
 	}
-}
-
-function bool NearbyMonsterWP()
-{
-	local Triggers TT;
-	ForEach RadiusActors( class'Triggers', TT, 200)
-		if ( TT.IsA('MonsterWaypoint') && MHS.static.ActorsTouching( self, TT, 10, 10) )
-			return true;
 }
 
 

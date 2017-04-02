@@ -30,7 +30,7 @@ function RegisterCounter( Counter NewCounter)
 
 function bool CausesEvent( name aEvent)
 {
-	return !bCompleted && (MarkedCounter != None) && (MarkedCounter.Event == aEvent);
+	return !bCompleted && (MarkedCounter != None) && HasEvent(aEvent);
 }
 function name RequiredEvent() //Will this redirect bots towards monsters?
 {
@@ -113,6 +113,8 @@ function PostInit()
 		if ( bFirstCounter )
 		{
 			CountersTotal = ActiveCounters();
+			AnalyzeEvent( MarkedCounter.Tag);
+
 			//Identify other trigger
 			//Monster Spawner never return true because it doesn't really directly trigger this actor
 			For ( MHE=Briefing.MapEventList ; MHE!=None ; MHE=MHE.NextEvent )
@@ -136,6 +138,7 @@ function PostInit()
 						{
 							C.bSpawnerContains = true;
 							C.bSpawnerCompletes = TF.Capacity + TF.NumItems + int(bEnabledWithoutSpawner) >= C.MarkedCounter.NumToCount;
+							C.EventChain = EventChain; //Propagate event chain to other counters
 						}
 					}
 				}

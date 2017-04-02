@@ -159,7 +159,7 @@ function MutatorTakeDamage( out int ActualDamage, Pawn Victim, Pawn InstigatedBy
 		MPD = MonsterHunt(Level.Game).Briefing.GetPlayerData( InstigatedBy.PlayerReplicationInfo.PlayerID);
 		if ( MPD != None )
 		{
-			Res = (MPD.AccDamage += ActualDamage) / Game.DamageToScore;
+			Res = (MPD.AccDamage += Min(ActualDamage,Victim.Health) ) / Game.DamageToScore;
 			if ( Res > 0 )
 			{
 				InstigatedBy.PlayerReplicationInfo.Score += Res;

@@ -180,6 +180,21 @@ state Server
 			}
 	}
 	
+	function GenerateMonsters()
+	{
+		local ScriptedPawn S;
+		local MHE_Monster MHE_B, MHE_C;
+		
+		ForEach AllActors( class'ScriptedPawn', S)
+			if ( S.Event != '' )
+			{
+				MHE_B = MHE_Monster(MapEventList);
+				if ( MHE_B != None )	MHE_C = MHE_B.AvailableForEvent( S.Event);
+				if ( MHE_C == None )	MHE_C = Spawn( class'MHE_Monster');
+				MHE_C.RegisterMonster( S);
+			}
+	}
+	
 	//Post-Init events one by one, if all are inited in a single row, stop
 	function bool PostInit()
 	{
@@ -212,6 +227,9 @@ Begin:
 	GenerateCounters();
 	Sleep( 0.01);
 	GenerateButtons();
+	Sleep( 0.01);
+	GenerateMonsters();
+	Sleep( 0.01);
 	
 	While ( !PostInit() )
 		Sleep( 0.01);

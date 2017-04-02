@@ -13,9 +13,26 @@ var(Debug) NavigationPoint DeferTo;
 var(Debug) bool bDiscovered;
 var(Debug) bool bPostInit;
 var(Debug) bool bCompleted; //Disable if the event is temporarily unavailable (ex: interpolating button)
+var(Debug) bool bQueriedByBot;
 var(Debug) bool bAttractBots; //Never enable if Event cannot yet function or if it doesn't unlock anything (ex: disabled trigger, door trigger)
+var(Debug) bool bAwardedPoint;
 //Regarding attraction after hitting a door
 //The MHE_Base actor's Tag can redirect
+
+var(DebugEvents) bool bSimpleDoorTrigger;
+var(DebugEvents) bool bUnlocksStructure;
+var(DebugEvents) bool bUnlocksRoutes;
+var(DebugEvents) bool bTriggersPlayerStart;
+var(DebugEvents) bool bTriggersCounter;
+var(DebugEvents) bool bTriggersPawn;
+var(DebugEvents) bool bTriggersFactory;
+var(DebugEvents) bool bTriggersMover;
+var(DebugEvents) bool bTogglesTriggers;
+var(DebugEvents) bool bModifiesTriggers; //Important
+
+var(DebugEvents) string EventChain;
+var int AnalyzeDepth;
+
 
 //Query tags are good tools
 var int PathQueryTag;
@@ -41,9 +58,140 @@ function PostInit()
 	bPostInit = true;
 }
 
-function bool CausesEvent( name aEvent);
+
+
+
+
+//=========================================
+//=========================================
+// Event handler
+
 function name RequiredEvent(); //If this MHE_Base needs to be enabled, provide a tag
-function RequiredForEvent(); //Somebody needs to activate this MHE_Base in order to activate an event
+
+function RequiredForEvent() //Somebody needs to activate this MHE_Base in order to activate an event
+{
+	bQueriedByBot = true;
+}
+
+function ResetEvents()
+{
+	bSimpleDoorTrigger = false;
+	bUnlocksStructure = false;
+	bUnlocksRoutes = false;
+	bTriggersPlayerStart = false;
+	bTriggersCounter = false;
+	bTriggersPawn = false;
+	bTriggersFactory = false;
+	bTriggersMover = false;
+	bTogglesTriggers = false;
+	bModifiesTriggers = false;
+	EventChain = ";";
+}
+
+function bool CausesEvent( name aEvent)
+{
+	return HasEvent( aEvent);
+}
+
+final function bool HasEvent( name aEvent)
+{
+	return InStr( EventChain, ";"$aEvent$";") != -1;
+}
+
+final function AddEvent( name aEvent)
+{
+	EventChain = EventChain $ string(aEvent) $ ";";
+}
+
+function AnalyzeEvent( name aEvent)
+{
+	local Actor A;
+	local Mover M;
+	local NavigationPoint N;
+	local int i;
+	//Avoid registering the mechanism's tag if possible
+	if ( aEvent == '' || aEvent == 'None' || aEvent == Tag || (AnalyzeDepth > 20) || HasEvent(aEvent) )
+		return;
+	AddEvent(aEvent);
+	
+	AnalyzeDepth++;
+	ForEach AllActors( class'Actor', A, aEvent)
+	{
+		if ( A.IsA('Mover') )
+		{
+			if ( InStr( A.GetStateName(),"Trigger") != -1 ) 
+			{
+				if ( VSize( A.Location - Location) < 600 )
+					bSimpleDoorTrigger = true;
+				else
+					bTriggersMover = true;
+				M = Mover(A);
+				if ( !M.bInterpolating && (M.KeyNum == 0) )
+				{
+					AnalyzeEvent( M.Event); //Identify this Mover's event as caused by self
+					if ( !M.IsInState('TriggerToggle') && (M.bTriggerOnceOnly || (M.StayOpenTime > 9999)) )
+						bUnlocksStructure = true; //TriggerToggle ignores bTriggerOnceOnly!!!
+				}
+			}
+		}
+		else if ( A.IsA('Triggers') )
+		{
+			if ( A.IsA('Counter') )
+			{
+				bTriggersCounter = bTriggersCounter || (Counter(A).NumToCount > 0);
+			}
+			else if ( A.IsA('Dispatcher') )
+			{
+				For ( i=0 ; i<8 ; i++ )
+					AnalyzeEvent( Dispatcher(A).OutEvents[i] );
+			}
+			else if ( A.IsA('Trigger') )
+			{
+				if ( A.bCollideActors )
+				{
+					if ( A.IsInState('TriggerToggle') )
+					{
+						bTogglesTriggers = true;
+						bModifiesTriggers = bModifiesTriggers || Trigger(A).bTriggerOnceOnly;
+					}
+					else if ( (A.IsInState('OtherTriggerTurnsOn') && !Trigger(A).bInitiallyActive)
+							|| (A.IsInState('OtherTriggerTurnsOff') && Trigger(A).bInitiallyActive) )
+						bModifiesTriggers = true;
+				}
+			}
+		}
+		else if ( A.bIsPawn )
+		{
+			bTriggersPawn = true;
+		}
+		else if ( A.IsA('ThingFactory') )
+		{
+			bTriggersFactory = bTriggersFactory || (ThingFactory(A).Capacity > 0);
+		}
+		else if ( A.IsA('NavigationPoint') )
+		{
+			N = NavigationPoint(A);
+			bTriggersPlayerStart = bTriggersPlayerStart || N.IsA('PlayerStart');
+			bUnlocksRoutes = bUnlocksRoutes || (!N.IsA('PlayerStart') && (!N.IsA('BlockedPath') || (N.ExtraCost > 0)) );
+		}
+		else if ( A.IsA('ExplodingWall') )
+		{
+			AnalyzeEvent( A.Event);
+		}
+	}
+	AnalyzeDepth--;
+}
+
+
+
+//=========================================
+//=========================================
+// BOT attraction
+
+function bool ShouldAttractBots()
+{
+	return (bUnlocksStructure || bTriggersCounter || bUnlocksRoutes || bModifiesTriggers || bTriggersPlayerStart || bQueriedByBot);
+}
 
 
 function bool ShouldDefer( Pawn Other)
@@ -142,6 +290,16 @@ function FindDeferPoint( Actor DeferFor)
 }
 
 
+function bool NearbyMonsterWP()
+{
+	local Triggers TT;
+	ForEach RadiusActors( class'Triggers', TT, 200)
+		if ( TT.IsA('MonsterWaypoint') && MHS.static.ActorsTouching( self, TT, 10, 10) )
+			return true;
+}
+
+
+
 event PostBeginPlay()
 {
 	if ( MonsterBriefing(Owner) != None )
@@ -175,17 +333,18 @@ function IncreaseObjectiveCounter( Pawn Other)
 {
 	local MonsterPlayerData MPD;
 	
-	if ( Other == None || Other.PlayerReplicationInfo == None )
+	if ( Other == None || Other.PlayerReplicationInfo == None || bAwardedPoint )
 		return;
+	Other.PlayerReplicationInfo.Score += 1;
 	MPD = Briefing.GetPlayerData( Other.PlayerReplicationInfo.PlayerID);
 	if ( MPD != None )
-	{
 		MPD.ObjectivesTaken++;
-	}
+	bAwardedPoint = true;
 }
 
 
 defaultproperties
 {
 	bCollideActors=False
+	EventChain=";"
 }

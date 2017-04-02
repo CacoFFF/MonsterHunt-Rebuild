@@ -701,7 +701,7 @@ function bool AttractTo( Pawn Other, Actor Dest, optional bool bNoSearch)
 	{
 		BestDist = 700;
 		ForEach Dest.RadiusActors( class'NavigationPoint', N, 500 )
-			if ( N != Dest )
+			if ( (N != Dest) && (N.UpstreamPaths[0] != -1) ) //Make sure it's reachable in network
 			{
 				Vect = N.Location - Dest.Location;
 				Dist = VSize( Vect);
@@ -832,39 +832,25 @@ function bool FindSpecialAttractionFor( Bot aBot)
 			Goto ATTRACT_DEST;
 		BestW = None;
 
-		ChanceW = 1;
+		ChanceW = 0;
 		Limit = 0;
 		For ( W=WaypointList ; W!=None ; W=W.NextWaypoint )
-		{
 			if ( W.bEnabled && !W.bVisited )
 			{
 				if ( Limit <= 0 )
 					Limit = W.Position;
-				else if ( W.Position > Limit+2 ) //Don't seek past next 2 objectives (speed reasons, game reasons, etc)
+				else if ( W.Position > Limit ) //Don't seek past next objective
 					break;
 				if ( W.DeferTo != None )
 					bAttract = AttractTo( aBot, W.DeferTo, true);
 				else
 					bAttract = AttractTo( aBot, W);
-				if ( bAttract ) //Only query reachable objectives
+				if ( bAttract && (FRand() < 1.0/(ChanceW+=1)) ) //Only query reachable objectives, pick random
 				{
-					if ( BestW == None ) //Get first one
-						BestW = W;
-					else if ( W.Position > BestW.Position ) //Stop if we're going past the position
-						break;
-					else //Otherwise randomize among WP's with same priority
-					{
-						ChanceW += 1.0;
-						if ( FRand() < 1.0/ChanceW )
-							BestW = W;
-					}
-					
-					//We changed objectives, change attraction point
-					if ( BestW == W )
-						NewDest = aBot.MoveTarget;
+					BestW = W;
+					NewDest = aBot.MoveTarget;
 				}
 			}
-		}
 		
 		//Assign objective and attract
 		if ( NewDest != None )
