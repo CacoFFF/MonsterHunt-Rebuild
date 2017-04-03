@@ -3,7 +3,6 @@ class MHE_SingularEvent expands MHE_Base;
 
 var(Debug) Actor MarkedMechanism;
 var bool bRecheckEvents;
-var(Debug) bool bQueriedByBot; //Temporarily enable attraction
 var(Debug) bool bMultiHit;
 var(Debug) bool bShoot;
 

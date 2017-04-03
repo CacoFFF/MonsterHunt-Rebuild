@@ -48,6 +48,15 @@ event Trigger( Actor Other, Pawn EventInstigator)
 		Destroy();
 }
 
+event Timer()
+{
+	if ( MarkedCounter != None )
+	{
+		ResetEvents();
+		AnalyzeEvent( MarkedCounter.Event);
+	}
+}
+
 event Destroyed()
 {
 	local MHE_Base MHE;
@@ -113,7 +122,8 @@ function PostInit()
 		if ( bFirstCounter )
 		{
 			CountersTotal = ActiveCounters();
-			AnalyzeEvent( MarkedCounter.Tag);
+			AnalyzeEvent( MarkedCounter.Event);
+			SetTimer( 5+FRand(), true);
 
 			//Identify other trigger
 			//Monster Spawner never return true because it doesn't really directly trigger this actor

@@ -32,6 +32,7 @@ var(DebugEvents) bool bModifiesTriggers; //Important
 
 var(DebugEvents) string EventChain;
 var int AnalyzeDepth;
+var Name TmpName;
 
 
 //Query tags are good tools
@@ -117,6 +118,8 @@ function AnalyzeEvent( name aEvent)
 	AnalyzeDepth++;
 	ForEach AllActors( class'Actor', A, aEvent)
 	{
+		bUnlocksRoutes = bUnlocksRoutes || A.IsA('FV_PathBlocker');
+		bTriggersPawn = bTriggersPawn || A.bIsPawn;
 		if ( A.IsA('Mover') )
 		{
 			if ( InStr( A.GetStateName(),"Trigger") != -1 ) 
@@ -160,24 +163,33 @@ function AnalyzeEvent( name aEvent)
 				}
 			}
 		}
-		else if ( A.bIsPawn )
-		{
-			bTriggersPawn = true;
-		}
 		else if ( A.IsA('ThingFactory') )
 		{
-			bTriggersFactory = bTriggersFactory || (ThingFactory(A).Capacity > 0);
+			bTriggersFactory = bTriggersFactory || (A.IsInState('Waiting') && (ThingFactory(A).Capacity > 0));
+		}
+		else if ( A.IsA('B_MonsterSpawner') )
+		{
+			if ( A.IsInState('Waiting') )
+			{
+				bTriggersFactory = true;
+				SetPropertyText("TmpName", A.GetPropertyText("FinishedEventTag") );
+				AnalyzeEvent( TmpName);
+			}
 		}
 		else if ( A.IsA('NavigationPoint') )
 		{
-			N = NavigationPoint(A);
-			bTriggersPlayerStart = bTriggersPlayerStart || N.IsA('PlayerStart');
-			bUnlocksRoutes = bUnlocksRoutes || (!N.IsA('PlayerStart') && (!N.IsA('BlockedPath') || (N.ExtraCost > 0)) );
+			if ( !A.IsA('SpawnPoint') )
+			{
+				N = NavigationPoint(A);
+				bTriggersPlayerStart = bTriggersPlayerStart || N.IsA('PlayerStart');
+				bUnlocksRoutes = bUnlocksRoutes || (!N.IsA('PlayerStart') && (N.ExtraCost > 0));
+			}
 		}
 		else if ( A.IsA('ExplodingWall') )
 		{
 			AnalyzeEvent( A.Event);
 		}
+		
 	}
 	AnalyzeDepth--;
 }
@@ -229,7 +241,7 @@ function FindDeferPoint( Actor DeferFor)
 					Best = N;
 					break;
 				}
-				if ( (Best == None) || (Best.ExtraCost > N.ExtraCost) )
+				if ( (Best == None) || (Best.ExtraCost + VSize(Best.Location-Location) > N.ExtraCost + VSize(N.Location-Location)) )
 					Best = N;
 			}
 		if ( Best == None )
