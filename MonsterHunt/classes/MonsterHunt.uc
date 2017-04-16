@@ -55,8 +55,9 @@ event InitGame(string Options, out string Error)
 	MaxAllowedTeams = 1;
 
 	//Beta auto-upgrade
-	if ( ClientExtensionClass == "MonsterBetaCL_0.MHCL_MonsterBriefing" )
-		ClientExtensionClass = "MonsterBetaCL_1.MHCL_MonsterBriefing";
+	if ( ClientExtensionClass == "MonsterBetaCL_0.MHCL_MonsterBriefing"
+		|| ClientExtensionClass == "MonsterBetaCL_1.MHCL_MonsterBriefing" )
+		ClientExtensionClass = "MonsterBetaCL_2.MHCL_MonsterBriefing";
 	
 	BriefingClass = class<MonsterBriefing>( DynamicLoadObject(ClientExtensionClass,class'class') );
 	if ( BriefingClass == None )
@@ -83,7 +84,10 @@ event InitGame(string Options, out string Error)
 		}
 
 	Briefing = Spawn( BriefingClass);
-	T = Texture( DynamicLoadObject(HunterTeamIcon,class'Texture') );
+	T = Texture( DynamicLoadObject(HunterTeamIcon,class'Texture', true) );
+	if ( T == None )	T = Texture( DynamicLoadObject(HunterTeamIcon,class'IceTexture', true) );
+	if ( T == None )	T = Texture( DynamicLoadObject(HunterTeamIcon,class'FireTexture', true) );
+	if ( T == None )	T = Texture( DynamicLoadObject(HunterTeamIcon,class'WetTexture', true) );
 	if ( T != None )
 	{
 		Briefing.HuntersIcon = T;

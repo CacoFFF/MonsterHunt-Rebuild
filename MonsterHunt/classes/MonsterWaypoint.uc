@@ -7,8 +7,17 @@ class MonsterWaypoint expands Triggers;
 #exec TEXTURE IMPORT NAME=MHMarker FILE=pcx\MHMarker.pcx
 
 var(Waypoint) int Position;
-var(Waypoint) bool bEnabled;
+var(Waypoint) Actor TriggerItem;
+var(Waypoint) name TriggerEvent1;
+var(Waypoint) name TriggerEvent2;
+var(Waypoint) name TriggerEvent3;
+var(Waypoint) name TriggerEvent4;
+var Actor TriggerActor1;
+var Actor TriggerActor2;
+var Actor TriggerActor3;
+var Actor TriggerActor4;
 var bool bVisited;
+var(Waypoint) bool bEnabled;
 
 var MonsterWaypoint NextWaypoint;
 var NavigationPoint DeferTo; //Alternate location to go to
@@ -32,6 +41,12 @@ function Touch( Actor Other)
 		if ( Event != '' )
 			ForEach AllActors (class'Actor', A, Event)
 				A.Trigger( self, Pawn(Other));
+		if ( (TriggerItem != None) && Pawn(Other).PlayerReplicationInfo.bIsABot )
+		{
+			if ( TriggerItem.IsA('Mover') )
+				TriggerItem.Bump(Other);
+			TriggerItem.Trigger(self,Pawn(Other));
+		}
 		if ( MonsterHunt(Level.Game) != None )
 			MonsterHunt(Level.Game).WaypointVisited( self, Pawn(Other).PlayerReplicationInfo );
  	}
