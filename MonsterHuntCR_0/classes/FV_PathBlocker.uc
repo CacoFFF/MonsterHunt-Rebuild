@@ -52,6 +52,8 @@ event Destroyed()
 			{
 				class'MHCR_Statics'.static.AddPathTo( BlockedStarts[BlockedCount], ReachSpec[BlockedCount] );
 				class'MHCR_Statics'.static.AddUPathTo( BlockedDestinations[BlockedCount], ReachSpec[BlockedCount] );
+				if ( Teleporter(BlockedStarts[BlockedCount]) != None ) //Re-enable this probe once the teleporter works
+					BlockedStarts[BlockedCount].Enable('SpecialHandling');
 			}
 		}
 	
@@ -153,11 +155,12 @@ function SetupTeleporter( Teleporter T)
 	local Actor Start, End;
 	local Teleporter TEnd;
 	local int rD, rF;
-	local int i;
+	local int i, oldBlockedCount;
 
 	if ( T == None || !T.bEnabled || T.URL == "" )
 		return;
 		
+	oldBlockedCount = BlockedCount;
 	while ( (i<16) && (T.Paths[i] != -1) )
 	{
 		describeSpec( T.Paths[i], Start, End, rF, rD);
@@ -170,9 +173,12 @@ function SetupTeleporter( Teleporter T)
 			class'MHCR_Statics'.static.RemovePathFrom( BlockedStarts[BlockedCount], ReachSpec[Blockedcount], i);
 			class'MHCR_Statics'.static.RemoveUPathFrom( BlockedDestinations[BlockedCount], ReachSpec[Blockedcount]);
 			if ( ++BlockedCount >= ArrayCount(ReachSpec) )
-				return;
+				break;
 			continue;
 		}
 		i++;
 	}
+	//MonsterHunt is overriding all logic, no need to 'handle' these teleporters
+	if ( oldBlockedCount != BlockedCount )
+		T.Disable('SpecialHandling');
 }

@@ -173,7 +173,7 @@ state Server
 				Spawn( class'MHE_SingularEvent', self).RegisterMechanism( T);
 				
 		ForEach AllActors( class'Mover', M)
-			if ( (M.InitialState == 'BumpOpenTimed' || M.InitialState == 'BumpButton') )
+			if ( (M.InitialState == 'BumpOpenTimed' || M.InitialState == 'BumpButton') || M.InitialState == 'StandOpenTimed' )
 			{
 				if ( M.Event != '' || M.BumpEvent != '' || M.PlayerBumpEvent != '' )
 					Spawn( class'MHE_SingularEvent', self).RegisterMechanism( M);

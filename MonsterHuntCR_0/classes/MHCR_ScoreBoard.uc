@@ -28,16 +28,6 @@ var Color BrightRed, BrightBlue, BrightGold, White, BrightCyan, Orange, Grey;
 var() localized string MonthString[13];
 var() localized string DayString[7];
 
-
-event Destroyed()
-{
-	//Level about to be purged, no need for additional processing
-	if ( (Level.NetMode == NM_Client) && (Owner != None) && Owner.bDeleteMe )
-		return;
-	Super.Destroyed();
-}
-
-
 function PostBeginPlay()
 {
 	Super.PostBeginPlay();
@@ -54,6 +44,10 @@ function PostBeginPlay()
 	PtsFont14 = Font( DynamicLoadObject( "LadderFonts.UTLadder14", class'Font' ) );
 	PtsFont12 = Font( DynamicLoadObject( "LadderFonts.UTLadder12", class'Font' ) );
 	Timer();
+	
+	//Prevent crashbug on clients by disabling this native Probe
+	if ( Level.NetMode == NM_Client )
+		Disable('Destroyed');
 }
 
 //Acquire some required actors
