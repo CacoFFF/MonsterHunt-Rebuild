@@ -1,6 +1,9 @@
 //Temporarily blocks NavigationPoints
 class FV_PathBlocker expands Info;
 
+const R_SPECIAL    = 0x00000020;
+
+
 var MonsterBriefing Briefing;
 var FV_PathBlocker NextBlocker;
 
@@ -165,7 +168,10 @@ function SetupTeleporter( Teleporter T)
 	{
 		describeSpec( T.Paths[i], Start, End, rF, rD);
 		TEnd = Teleporter(End);
-		if ( (TEnd != None) && (string(TEnd.Tag) ~= T.URL) && (Start == T) )
+		//Teleporter reachspecs are flagged R_SPECIAL and have 100 distance
+		//Teleporters can have more than one reachspec to their destination, if the destination is directly reachable
+		//So teleporters directly reachable to each other must still have their 'walk' reachspec functional after this
+		if ( (TEnd != None) && (string(TEnd.Tag) ~= T.URL) && (Start == T) && ((rF & R_SPECIAL) != 0) && (rD == 100) )
 		{
 			ReachSpec[Blockedcount] = T.Paths[i];
 			BlockedStarts[BlockedCount] = T;

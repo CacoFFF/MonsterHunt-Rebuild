@@ -3,8 +3,6 @@ class MHE_Monster expands MHE_Base;
 var ScriptedPawn Monsters[32];
 var int MonsterCount;
 var string EventChain;
-var bool bQueriedByBot;
-
 
 function MHE_Monster AvailableForEvent( name aEvent)
 {
@@ -44,23 +42,26 @@ event Timer()
 			Monsters[MonsterCount] = None;
 		}
 
-	if ( !bDiscovered )
+	if ( MonsterCount > 0 )
 	{
-		i = Rand(MonsterCount);
-		if ( (Monsters[i].Enemy != None) && (Monsters[i].Enemy.PlayerReplicationInfo != None) )
-			Discover();
-	}
-	
-	if ( DeferTo == None || !DeferTo.FastTrace( Monsters[0].Location) )
-	{
-		DeferTo = None;
-		SetLocation( Monsters[0].Location);
-		FindDeferPoint( Monsters[0] );
-	}
-	
-	if ( DeferTo == None )
-	{
-		//Do something?
+		if ( !bDiscovered )
+		{
+			i = Rand(MonsterCount);
+			if ( (Monsters[i].Enemy != None) && (Monsters[i].Enemy.PlayerReplicationInfo != None) )
+				Discover();
+		}
+		
+		if ( DeferTo == None || !DeferTo.FastTrace( Monsters[0].Location) )
+		{
+			DeferTo = None;
+			SetLocation( Monsters[0].Location);
+			FindDeferPoint( Monsters[0] );
+		}
+		
+		if ( DeferTo == None )
+		{
+			//Do something?
+		}
 	}
 		
 		
