@@ -42,6 +42,15 @@ native(3560) static final function bool ReplaceFunction( class<Object> ReplaceCl
 native(3561) static final function bool RestoreFunction( class<Object> RestoreClass, name RestoreFunction, optional name InState);
 
 
+
+/*************************************************************************************
+// Important functions to use in order to easily subclass MH without package dependancy
+
+function int GetMonstersPerZone( byte ZoneNumber);
+function bool ShouldDefer( Pawn Seeker, Actor Goal, out NavigationPoint DeferTo, out byte SuperDefer);
+
+*/
+
 event InitGame(string Options, out string Error)
 {
 	local Mutator M;
@@ -542,6 +551,36 @@ function int NearbyTeammates_XC( Pawn Other, float Distance, bool bVisible)
 	return i;
 }
 
+//Generic DeferTo return, good for package independant mods
+//SuperDefer = 1 means that no pathfinding should be done
+function bool ShouldDefer( Pawn Seeker, Actor Goal, out NavigationPoint DeferTo, out byte SuperDefer)
+{
+	if ( (MonsterWaypoint(Goal) != None) && (MonsterWaypoint(Goal).DeferTo != None) )
+	{
+		DeferTo = MonsterWaypoint(Goal).DeferTo;
+		return True;
+	}
+	
+	if ( (MonsterEnd(Goal) != None) && (MonsterEnd(Goal).DeferTo != None) )
+	{
+		DeferTo = MonsterEnd(Goal).DeferTo;
+		return true;
+	}
+
+	if ( (MHE_Base(Goal) != None) && (MHE_Base(Goal).DeferTo != None) )
+	{
+		if ( !MHE_Base(Goal).ShouldDefer( Seeker) ) //Bot already reached DeferTo
+			Goto SUPER_GOAL;
+		DeferTo = MHE_Base(Goal).DeferTo;
+		return true;
+	}
+		
+	return false;
+SUPER_GOAL: //Force bot into Goal no matter what
+	SuperDefer = 1;
+	return true;
+}
+
 //Returns 'tag' of whatever needs to be unlocked to reach next path
 function Name EvaluateNextNodeTeleporter( Pawn Other)
 {
@@ -666,17 +705,35 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 }
 
 
-
-
-
 //Sets MoveTarget on pawn
 //Can be called recursively once
 function bool AttractTo( Pawn Other, Actor Dest, optional bool bNoSearch)
 {
 	local NavigationPoint N, Nearest;
 	local float Dist, BestDist;
+	local byte NoPathFinding;
 	local vector Vect;
 	
+	if ( ShouldDefer( Other, Dest, Nearest, NoPathFinding) )
+	{
+		if ( NoPathFinding != 0 )
+		{
+			Other.MoveTarget = Dest;
+			return true;
+		}
+		//Simpler pathfinding when destination is deferring to a navigation point
+		if ( Nearest != None )
+		{
+			if ( Other.ActorReachable(Nearest) )
+			{
+				Other.MoveTarget = Nearest;
+				return true;
+			}
+			Other.MoveTarget = Other.FindPathToward(Nearest);
+			return Other.MoveTarget != None;
+		}
+	}
+
 	if ( Other.ActorReachable(Dest) ) //Check actor
 	{
 		Other.MoveTarget = Dest;
@@ -747,6 +804,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	local float BotState;
 	local ScriptedPawn Enemy;
 	local name RequiredEvent;
+	local byte NoAttractionCheck;
 	local bool bAttract;
 
 	if ( aBot.LastAttractCheck == Level.TimeSeconds )
@@ -800,7 +858,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 			{
 				if ( (aBot.Enemy == Enemy && Enemy.bIsBoss) || ReachableEnemy == None || ReachableEnemy.bDeleteMe )
 					ReachableEnemy = Enemy;
-				if ( aBot.OrderObject == None || aBot.OrderObject.bDeleteMe )
+				if ( aBot.OrderObject == None )
 					aBot.OrderObject = Enemy;
 				if ( aBot.MoveTarget == Enemy ) //Don't charge
 					return False;
@@ -814,19 +872,10 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		MHE = MHE_Base(aBot.OrderObject);
 		if ( MHE != None )
 		{
-			if ( MHE.bDeleteMe || !MHE.bAttractBots || MHE.bCompleted || (MHE.DeferTo == None) )
+			if ( !MHE.bAttractBots || MHE.bCompleted || (MHE.DeferTo == None) )
 				aBot.OrderObject = None;
-			else
-			{
-				if ( !MHE.ShouldDefer(aBot) )
-				{
-					//Add case of MHE requiring shoot
-					aBot.MoveTarget = MHE;
-					Goto ATTRACT_DEST;
-				}
-				if ( AttractTo( aBot, MHE.DeferTo, true) )
-					Goto ATTRACT_DEST;
-			}
+			else if ( AttractTo( aBot, MHE) )
+				Goto ATTRACT_DEST;
 		}
 		
 		//Otherwise prioritize the main objectives (sorted by priority)
@@ -845,11 +894,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 					Limit = W.Position;
 				else if ( W.Position > Limit ) //Don't seek past next objective
 					break;
-				if ( W.DeferTo != None )
-					bAttract = AttractTo( aBot, W.DeferTo, true);
-				else
-					bAttract = AttractTo( aBot, W);
-				if ( bAttract && (FRand() < 1.0/(ChanceW+=1)) ) //Only query reachable objectives, pick random
+				if ( AttractTo(aBot,W) && (FRand() < 1.0/(ChanceW+=1)) ) //Only query reachable objectives, pick random
 				{
 					BestW = W;
 					NewDest = aBot.MoveTarget;
@@ -868,7 +913,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		{
 			if ( !E.bInitiallyActive && E.bReachedByPlayer )
 				continue;
-			if ( (E.DeferTo != None && AttractTo( aBot, E.DeferTo, true)) || (E.DeferTo == None && AttractTo( aBot, E)) )
+			if ( AttractTo(aBot,E) )
 			{
 				NewDest = aBot.MoveTarget;
 				if ( E.bCollideActors && E.bInitiallyActive ) //Prioritize 
