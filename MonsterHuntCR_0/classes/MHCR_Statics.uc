@@ -6,14 +6,6 @@ native(3571) static final function float HSize( vector A);
 
 static final function bool InCylinder( vector V, float EX, float EZ)
 {
-	if ( Abs(V.Z) >= EZ )
-		return false;
-	V.Z = 0;
-	return VSize(V) < EX;
-}
-
-static final function bool InCylinder_XC( vector V, float EX, float EZ)
-{
 	return (Abs(V.Z) < EZ) && (HSize(V) < EX);
 }
 
@@ -93,4 +85,12 @@ static final function RemoveUPathFrom( NavigationPoint N, int iPath, optional in
 			break;
 		}
 	}
+}
+
+static final function PopRouteCache( out NavigationPoint List[16])
+{
+	local int i;
+	while ( i<15 && (List[i] != None) )
+		List[i] = List[++i];
+	List[15] = None;
 }

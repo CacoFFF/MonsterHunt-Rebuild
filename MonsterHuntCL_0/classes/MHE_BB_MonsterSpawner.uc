@@ -169,17 +169,6 @@ function int CountPawns()
 	local Actor S;
 	local int i;
 	
-	ForEach AllActors ( SP, S)
-		if ( S.Event == Tag )
-			i++;
-	return i;
-}
-
-function int CountPawns_XC()
-{
-	local Actor S;
-	local int i;
-	
 	ForEach DynamicActors ( SP, S)
 		if ( S.Event == Tag )
 			i++;

@@ -16,18 +16,9 @@ simulated event PostBeginPlay()
 	Spawn( class'MonsterBloodNotify');
 }
 
-function InitXCGE( int Version)
-{
-	Super.InitXCGE( Version); //XC_Engine servers will auto-load this package on ServerPackages (implicitly)
-	if ( Version >= 19 )
-	{
-		ReplaceFunction( class'MHE_BB_MonsterSpawner', class'MHE_BB_MonsterSpawner', 'CountPawns', 'CountPawns_XC');
-	}
-}
-
 function MonsterAuthenticator SpawnAuthenticator( Pawn Other)
 {
-	return Spawn(class'MonsterAuthenticator', Other);
+	return Spawn( class'MonsterAuthenticator', Other);
 }
 
 function MonsterPlayerData SpawnPlayerData( PlayerReplicationInfo aPRI)

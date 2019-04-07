@@ -7,6 +7,7 @@ const MHS = class'MHCR_Statics';
 
 var(Debug) MonsterBriefing Briefing;
 var(Debug) MHE_Base NextEvent;
+var(Debug) MHE_Base DeferUnreachable; //Defer objective if unreachable
 var(Debug) MHI_Base Interface;
 var(Debug) NavigationPoint DeferTo;
 //Pointer to net breifing element!
@@ -28,6 +29,7 @@ var(DebugEvents) bool bTriggersPawn;
 var(DebugEvents) bool bTriggersFactory;
 var(DebugEvents) bool bTriggersMover;
 var(DebugEvents) bool bTogglesTriggers;
+var(DebugEvents) bool bTogglesRoutes;
 var(DebugEvents) bool bModifiesTriggers; //Important
 
 var(DebugEvents) string EventChain;
@@ -47,7 +49,6 @@ var(Debug) enum EDeferToMode
 	DTM_NearestVisible
 } DeferToMode;
 
-native(3553) final iterator function DynamicActors( class<actor> BaseClass, out actor Actor, optional name MatchTag );
 
 function Discover()
 {
@@ -85,6 +86,7 @@ function ResetEvents()
 	bTriggersFactory = false;
 	bTriggersMover = false;
 	bTogglesTriggers = false;
+	bTogglesRoutes = false;
 	bModifiesTriggers = false;
 	EventChain = ";";
 }
@@ -182,7 +184,10 @@ function AnalyzeEvent( name aEvent)
 			{
 				N = NavigationPoint(A);
 				bTriggersPlayerStart = bTriggersPlayerStart || N.IsA('PlayerStart');
-				bUnlocksRoutes = bUnlocksRoutes || (!N.IsA('PlayerStart') && (N.ExtraCost > 0));
+				bTogglesRoutes = (A.IsA('Teleporter') && (Teleporter(A).URL != ""))
+								|| A.IsA('ToggledPath');
+				bUnlocksRoutes = bUnlocksRoutes 
+							|| (!N.IsA('PlayerStart') && (N.ExtraCost > 0));
 			}
 		}
 		else if ( A.IsA('ExplodingWall') )

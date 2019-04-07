@@ -47,9 +47,6 @@ replication
 }
 
 
-native(3540) final iterator function PawnActors( class<Pawn> PawnClass, out pawn P, optional float Distance, optional vector VOrigin, optional bool bHasPRI, optional Pawn StartAt);
-native(3553) final iterator function DynamicActors( class<actor> BaseClass, out actor Actor, optional name MatchTag );
-
 simulated event SetInitialState()
 {
 	if ( Level.NetMode == NM_Client )
@@ -205,15 +202,8 @@ QUERY:
 //******************************
 // Utilitary methods
 //******************************
-final function bool FindIpToCountry()
-{
-	if ( Ip2C_Actor != None )
-		return true;
-	ForEach AllActors( class'Actor', Ip2C_Actor, 'IpToCountry')
-		return true;
-}
 
-final function bool FindIpToCountry_XC()
+final function bool FindIpToCountry()
 {
 	if ( Ip2C_Actor != None )
 		return true;
@@ -222,16 +212,6 @@ final function bool FindIpToCountry_XC()
 }
 
 event BroadcastMessage( coerce string Msg, optional bool bBeep, optional name Type )
-{
-	local PlayerReplicationInfo PRI;
-
-	if (Type == '')	Type = 'Event';
-	ForEach AllActors( class'PlayerReplicationInfo', PRI)
-		if ( PlayerPawn(PRI.Owner) != None )
-			PlayerPawn(PRI.Owner).ClientMessage( Msg, Type, bBeep );
-}
-
-event BroadcastMessage_XC( coerce string Msg, optional bool bBeep, optional name Type )
 {
 	local PlayerPawn P;
 

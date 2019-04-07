@@ -1,13 +1,17 @@
 //****************************************************************
 // MonsterHunt rebuild
+// Requires XC_Engine v24, uses route mapper (XC_CORE 10)
 // All subclasses should also have their config in MonsterHunt.ini
 class MonsterHunt expands TeamGamePlus
 	config(MonsterHunt);
+
+const MHS = class'MHCR_Statics';
 
 var() config int MonsterSkill; //0 to 7 in v1...
 var() config int Lives;
 var() config bool bUseTeamSkins;
 var() config bool bReplaceUIWeapons;
+var() config bool bAIDebug;
 var() config int DamageToScore;
 var() config string HunterTeamName;
 var() config string HunterTeamIcon;
@@ -33,14 +37,6 @@ var(Debug) MonsterTriggerMarker TriggerMarkers;
 var(Debug) ScriptedPawn ReachableEnemy;
 
 var(Debug) private int MonstersPerZone[64]; //ACCESSOR: GetMonstersPerZone( byte ZoneNumber)
-
-//********************
-// XC_Core / XC_Engine
-native(1718) final function bool AddToPackageMap( optional string PkgName);
-native(3540) final iterator function PawnActors( class<Pawn> PawnClass, out pawn P, optional float Distance, optional vector VOrigin, optional bool bHasPRI, optional Pawn StartAt);
-native(3560) static final function bool ReplaceFunction( class<Object> ReplaceClass, class<Object> WithClass, name ReplaceFunction, name WithFunction, optional name InState);
-native(3561) static final function bool RestoreFunction( class<Object> RestoreClass, name RestoreFunction, optional name InState);
-
 
 
 /*************************************************************************************
@@ -75,13 +71,6 @@ event InitGame(string Options, out string Error)
 		return;
 	}
 	
-	if ( int(ConsoleCommand("GET INI:ENGINE.ENGINE.GAMEENGINE XC_VERSION")) >= 19 )
-	{
-		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'TaskMonstersVsBot', 'TaskMonstersVsBot_XC');
-		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountMonsters', 'CountMonsters_XC');
-		ReplaceFunction( class'MonsterHunt', class'MonsterHunt', 'CountHunters', 'CountHunters_XC');
-	}
-	
 	Super.InitGame( Options, Error);
 
 	//Validate UI replacements of MonsterBase
@@ -100,8 +89,11 @@ event InitGame(string Options, out string Error)
 	if ( T != None )
 	{
 		Briefing.HuntersIcon = T;
-		if ( (Level.NetMode != NM_Standalone) && (int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 11) )
+		if ( Level.NetMode != NM_Standalone )
+		{
+			Log("DEBUG "$Left(HunterTeamIcon, InStr(HunterTeamIcon,".")) );
 			AddToPackageMap( Left(HunterTeamIcon, InStr(HunterTeamIcon,".")) );
+		}
 	}
 	
 	bCountMonstersAgain = true;
@@ -485,59 +477,9 @@ function byte AssessBotAttitude(Bot aBot, Pawn Other)
 	return Super.AssessBotAttitude( aBot, Other);
 }
 
-function TaskMonstersVsBot( Bot aBot)
-{
-	local ScriptedPawn S;
-	ForEach AllActors(Class'ScriptedPawn',S)
-	{
-		if ( S.CanSee(aBot) )
-		{
-			if ( ((S.Enemy == None) || S.Enemy.IsA('PlayerPawn') && (FRand() >= 0.5)) && (S.Health >= 1) )
-			{
-				S.Hated = aBot;
-				S.Enemy = aBot;
-				aBot.Enemy = S;
-				S.GotoState('Attacking');
-				if ( FRand() >= 0.35 )
-				{
-					aBot.GotoState('Attacking');
-					return;
-				}
-			}
-		}
-		else
-		{
-			if ( aBot.CanSee(S) && (FRand() >= 0.34999999) && (S.Health >= 1) )
-			{
-				aBot.Enemy = S;
-				aBot.GotoState('Attacking');
-				S.Enemy = aBot;
-				S.GotoState('Attacking');
-				return;
-			}
-		}
-	}
-}
-function TaskMonstersVsBot_XC( Bot aBot);
-
 
 //Nearby hunters
 function int NearbyTeammates( Pawn Other, float Distance, bool bVisible)
-{
-	local Pawn P;
-	local int i;
-	
-	ForEach Other.RadiusActors ( class'Pawn', P, Distance)
-	{
-		if ( P.PlayerReplicationInfo == None || P.PlayerReplicationInfo.Team != Other.PlayerReplicationInfo.Team || P == Other )
-			continue;
-		if ( bVisible && !Other.FastTrace(P.Location + VRand() * P.CollisionRadius) )
-			continue;
-		i++;
-	}
-	return i;
-}
-function int NearbyTeammates_XC( Pawn Other, float Distance, bool bVisible)
 {
 	local Pawn P;
 	local int i;
@@ -555,27 +497,18 @@ function int NearbyTeammates_XC( Pawn Other, float Distance, bool bVisible)
 //SuperDefer = 1 means that no pathfinding should be done
 function bool ShouldDefer( Pawn Seeker, Actor Goal, out NavigationPoint DeferTo, out byte SuperDefer)
 {
-	if ( (MonsterWaypoint(Goal) != None) && (MonsterWaypoint(Goal).DeferTo != None) )
-	{
+	if ( MonsterWaypoint(Goal) != None )
 		DeferTo = MonsterWaypoint(Goal).DeferTo;
-		return True;
-	}
-	
-	if ( (MonsterEnd(Goal) != None) && (MonsterEnd(Goal).DeferTo != None) )
-	{
+	else if ( MonsterEnd(Goal) != None )
 		DeferTo = MonsterEnd(Goal).DeferTo;
-		return true;
-	}
-
-	if ( (MHE_Base(Goal) != None) && (MHE_Base(Goal).DeferTo != None) )
+	else if ( (MHE_Base(Goal) != None) && (MHE_Base(Goal).DeferTo != None) )
 	{
 		if ( !MHE_Base(Goal).ShouldDefer( Seeker) ) //Bot already reached DeferTo
 			Goto SUPER_GOAL;
 		DeferTo = MHE_Base(Goal).DeferTo;
-		return true;
 	}
 		
-	return false;
+	return DeferTo != None;
 SUPER_GOAL: //Force bot into Goal no matter what
 	SuperDefer = 1;
 	return true;
@@ -586,16 +519,16 @@ function Name EvaluateNextNodeTeleporter( Pawn Other)
 {
 	local Actor A, B;
 	local vector HitLocation, HitNormal;
-	local Teleporter Tele;
+	local Teleporter Tele[2];
+	local int i;
 
-	Tele = Teleporter(Other.MoveTarget);
-	if ( Tele == None )
-		Tele = Teleporter( Other.RouteCache[0] );
-	if ( (Tele == None) || (Teleporter(Other.RouteCache[1]) == None) ) //Not going through teleporter
-		return '';
-
-	if ( !Tele.bEnabled )
-		return Tele.Tag;
+	While ( i<3 )
+	{
+		Tele[0] = Teleporter(Other.RouteCache[i]);
+		Tele[1] = Teleporter(Other.RouteCache[++i]);
+		if ( (Tele[0] != None) && (Tele[1] != None) && !Tele[0].bEnabled ) //SpecialHandling can be especially annoying
+			return Tele[0].Tag;
+	}
 	return '';
 }
 
@@ -630,10 +563,11 @@ function Name EvaluateNextNodeDoor( Pawn Other)
 
 //Find what triggers this 'tag' and evaluate reachability
 //List all available MHE_Base actors
+//Requires Route Mapper to have run
 //BlockType codes:
 // - 1: Door
 // - 2: Teleporter
-function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
+function bool ModifyObjective( Pawn Other, name RequiredEvent, int BlockType, out Actor Objective)
 {
 	local MHE_Base Events[16], Link;
 	local int iE, i;
@@ -641,9 +575,19 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 	local FV_PathBlocker FVPB;
 	local NavigationPoint NextPath;
 	
-	NextPath = NavigationPoint(Other.MoveTarget);
-	if ( NextPath == None )
-		NextPath = Other.RouteCache[0];
+	//Obtain path to block
+	if ( BlockType == 2 )
+	{
+		for ( i=0 ; i<3 && NextPath == None && Other.RouteCache[i] != None ; i++ )
+			if ( (Teleporter(Other.RouteCache[i]) != None) && !Teleporter(Other.RouteCache[i]).bEnabled )
+				NextPath = Teleporter(Other.RouteCache[i]);
+	}
+	else
+	{
+		NextPath = NavigationPoint(Other.MoveTarget);
+		if ( NextPath == None )
+			NextPath = Other.RouteCache[0];
+	}
 	if ( (NextPath == None) || (RequiredEvent == '') )
 		return false;
 		
@@ -652,10 +596,15 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 	
 	//Don't block aggresively
 	if ( iE == 0 )
+	{
+		if ( bAIDebug )
+			Log("Unable to find trigger chain for"@RequiredEvent@"["$Other.PlayerReplicationInfo.PlayerName@"-"@BlockType$"]",'MonsterHunt');
 		return false;
+	}
 	
 	//Sort by distance
-	For ( i=1 ; i<iE ; i++ )
+	Briefing.SortEventsByProximity( Other.Location, Events, iE);
+/*	For ( i=1 ; i<iE ; i++ )
 		if ( VSize(Events[i].Location-Other.Location) < VSize(Events[i-1].Location-Other.Location) )
 		{
 			Link = Events[i];
@@ -663,7 +612,7 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 			Events[i-1] = Link;
 			if ( i > 1 )
 				i -= 2;
-		}
+		}*/
 
 	//Get nearest attraction point
 	//Start with stuff that aren't objective markers
@@ -674,8 +623,12 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 			if ( Dist > 1500 )
 				break;
 			//Attraction point is nearby, send bot instead of altering objective
-			if ( Other.PointReachable(Events[i].Location) || ( AttractTo(Other,Events[i],true) && (Other.MoveTarget == Events[i]) ) )
+			if ( AttractTo(Other,Events[i]) && (Other.MoveTarget == Events[i]) )
+				return false;
+			if ( Dist < 200 && Other.FastTrace(Events[i].Location) )
 			{
+				if ( bAIDebug )
+					Log("Forcing ugly attraction deferment for event"@RequiredEvent@"["$Other.PlayerReplicationInfo.PlayerName@"-"@BlockType$"]",'MonsterHunt');
 				Other.MoveTarget = Events[i];
 				return false;
 			}
@@ -685,6 +638,8 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 	FVPB = Briefing.GetPathBlocker( RequiredEvent);
 	if		( BlockType == 1 )	FVPB.SetupBlock( NextPath, RequiredEvent);
 	else if	( BlockType == 2 )	FVPB.SetupTeleporter( Teleporter(NextPath) );
+	if ( bAIDebug )
+		Log("Blocking route that leads to"@RequiredEvent@"["$Other.PlayerReplicationInfo.PlayerName@"-"@BlockType$"]",'MonsterHunt');
 	//Notify MHE_Base we're becoming an objective, allows MHE_Base to self-modify
 	For ( i=0 ; i<iE ; i++ )
 		Events[i].RequiredForEvent();
@@ -696,101 +651,93 @@ function bool ModifyObjective( Bot Other, name RequiredEvent, int BlockType)
 				Other.MoveTarget = Events[i];
 				return false;
 			}
-			if ( (Other.Orders != 'Follow') && AttractTo( Other, Events[i].DeferTo, true) )
+			if ( AttractTo( Other, Events[i].DeferTo) )
 			{
-				Other.OrderObject = Events[i];
+				Objective = Events[i].DeferTo;
 				return true;
 			}
 		}
 }
 
 
+// This will ONLY return a non-NavigationPoint instance when it is directly reachable
+function Actor SelectNearestEndpoint( Pawn Seeker, Actor Goal)
+{
+	local NavigationPoint Nearest, N;
+	local float Dist, BestDist, LowestWeight;
+	local byte SuperDefer;
+	local vector CloserPoint;
+	
+	if ( ShouldDefer( Seeker, Goal, Nearest, SuperDefer) && (SuperDefer != 0) )
+		return Goal; // Goal is directly reachable >>> force mode
+	
+	if ( Nearest != None ) // Override
+		Goal = Nearest; 
+		
+	if ( (NavigationPoint(Goal) != None) && (NavigationPoint(Goal).StartPath != None) )
+		return Goal; //Goal is mapped NavigationPoint
+	
+	// If goal is reachable, return it
+	if ( Seeker.ActorReachable(Goal) )
+		return Goal;
+	CloserPoint = Goal.Location + Normal( Seeker.Location - Goal.Location) * (Seeker.CollisionRadius + Goal.CollisionRadius);
+	if ( Seeker.PointReachable(CloserPoint) )
+		return Goal;
+	
+	// Find nearby mapped NavigationPoint actors, then use special trace
+	BestDist = 500 + int(Goal.bIsPawn) * 2500;
+	LowestWeight = 10000000;
+	ForEach NavigationActors( class'NavigationPoint', N, BestDist, Goal.Location)
+		if ( N.StartPath != None )
+			LowestWeight = Min( LowestWeight, float(N.VisitedWeight));
+	ForEach NavigationActors( class'NavigationPoint', N, BestDist, Goal.Location)
+		if ( N.StartPath != None )
+		{
+			Dist = VSize( Goal.Location - N.Location) + (float(N.VisitedWeight)-LowestWeight) * 0.33;
+			if ( Dist < BestDist )
+			{
+				CloserPoint = Goal.Location + Normal( N.Location - Goal.Location) * (Seeker.CollisionRadius + Goal.CollisionRadius);
+				if ( FastTrace( N.Location, CloserPoint) )
+				{
+					Nearest = N;
+					BestDist = Dist;
+				}
+			}
+		}
+	return Nearest;
+}
+
 //Sets MoveTarget on pawn
 //Can be called recursively once
-function bool AttractTo( Pawn Other, Actor Dest, optional bool bNoSearch)
+function bool AttractTo( Pawn Seeker, Actor Goal)
 {
 	local NavigationPoint N, Nearest;
 	local float Dist, BestDist;
 	local byte NoPathFinding;
 	local vector Vect;
+	local Actor EndPoint;
 	
-	if ( ShouldDefer( Other, Dest, Nearest, NoPathFinding) )
+	EndPoint = SelectNearestEndpoint( Seeker, Goal);
+	if ( (NavigationPoint(EndPoint) != None) && NavigationPoint(EndPoint).StartPath != None )
 	{
-		if ( NoPathFinding != 0 )
+		// Build route and discard paths Seeker is touching
+		// SpecialHandling may modify result
+		Seeker.MoveTarget = BuildRouteCache( NavigationPoint(EndPoint), Seeker.RouteCache, Seeker);
+		
+		// Override EndPoint if already reached
+		if ( (Seeker.MoveTarget == EndPoint) && MHS.static.ActorsTouching( Seeker, EndPoint) )
 		{
-			Other.MoveTarget = Dest;
-			return true;
+			if ( !Goal.bIsPawn ) //Shoot mode, don't override >>> TODO: EXPAND SHOOT CASES
+				Seeker.MoveTarget = Goal;
 		}
-		//Simpler pathfinding when destination is deferring to a navigation point
-		if ( Nearest != None )
-		{
-			if ( Other.ActorReachable(Nearest) )
-			{
-				Other.MoveTarget = Nearest;
-				return true;
-			}
-			Other.MoveTarget = Other.FindPathToward(Nearest);
-			return Other.MoveTarget != None;
-		}
-	}
-
-	if ( Other.ActorReachable(Dest) ) //Check actor
-	{
-		Other.MoveTarget = Dest;
 		return true;
 	}
-	Vect = Dest.Location + Normal( Other.Location - Dest.Location) * (Other.CollisionRadius + Dest.CollisionRadius);
-	if ( Other.PointReachable( Vect) ) //Check a point that allows touching the actor
-	{
-		Other.MoveTarget = Dest;
-		return true;
-	}
-	N = NavigationPoint(Other.FindPathToward(Dest) ); //Find path to actor
-	if ( N != None )
-	{
-		Other.MoveTarget = N;
-		return true;
-	}
-	N = NavigationPoint(Other.FindPathTo(Vect) ); //Find path to said point
-	if ( N != None )
-	{
-		Other.MoveTarget = N;
-		return true;
-	}
-	
-	if ( !bNoSearch )
-	{
-		BestDist = 700;
-		ForEach Dest.RadiusActors( class'NavigationPoint', N, 500 )
-			if ( (N != Dest) && (N.UpstreamPaths[0] != -1) ) //Make sure it's reachable in network
-			{
-				Vect = N.Location - Dest.Location;
-				Dist = VSize( Vect);
-				if ( Dist < BestDist )
-				{
-					Vect = Normal( Vect);
-					Vect.X *= Dest.CollisionRadius;
-					Vect.Y *= Dest.CollisionRadius;
-					Vect.Z *= Dest.CollisionHeight * 0.5;
-					if ( N.FastTrace(Dest.Location + Vect) )
-					{
-						Nearest = N;
-						BestDist = Dist;
-					}
-				}
-			}
-		if ( Nearest != None )
-		{
-			if ( VSize(Nearest.Location - Other.Location) < 30 ) //We're touching nearest waypoint, go straight to destination
-			{
-				Other.MoveTarget = Dest;
-				return true;
-			}
-			return AttractTo( Other, Nearest, true); //Recurse once and attract to Nearest
-		}
-	}
-	return false;
+	if ( EndPoint == None )
+		return false;
+	Seeker.MoveTarget = EndPoint;
+	return true;
 }
+
 
 function bool FindSpecialAttractionFor( Bot aBot)
 {
@@ -798,7 +745,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	local MHE_Base MHE;
 	local float ChanceW;
 	local MonsterEnd E;
-	local Actor NewDest;
+	local Actor NewDest, NewObjective;
 	local int Limit, MonsterLimit;
 	local int BotID;
 	local float BotState;
@@ -818,8 +765,6 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	
 	if ( (aBot.OrderObject != None) && aBot.OrderObject.bDeleteMe )
 		aBot.OrderObject = None;
-	if ( Level.TimeSeconds - aBot.LastAttractCheck > 0.3 )
-		TaskMonstersVsBot(aBot);
 	aBot.LastAttractCheck = Level.TimeSeconds;
 	
 	//Force attack for now...
@@ -843,6 +788,8 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		if ( BotState < 1.5 ) 
 			return False;
 			
+		//Initiate Route Mapper
+		MapRoutes( aBot);
 
 		//8-12 seconds prioritizing monsters (if MonsterLimit is too low the bot bounces back and forth!!)
 		MonsterLimit = 4
@@ -941,7 +888,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		
 		//Defer to a MHE_Event objective if failed to find anything else
 		MHE = Briefing.GetNextBotAttractor();
-		if ( (MHE != None) && AttractTo( aBot, MHE.DeferTo, true) )
+		if ( (MHE != None) && AttractTo( aBot, MHE.DeferTo) )
 		{
 			aBot.OrderObject = MHE;
 			Goto ATTRACT_DEST;
@@ -952,13 +899,15 @@ ATTRACT_DEST:
 	NewDest = aBot.OrderObject;
 	RequiredEvent = EvaluateNextNodeDoor( aBot);
 	if ( RequiredEvent != '' )
-		ModifyObjective( aBot, RequiredEvent, 1); //Door Type
+		ModifyObjective( aBot, RequiredEvent, 1, NewObjective); //Door Type
 	else
 	{
 		RequiredEvent = EvaluateNextNodeTeleporter( aBot);
 		if ( RequiredEvent != '' )
-			ModifyObjective( aBot, RequiredEvent, 2); //Teleporter type
+			ModifyObjective( aBot, RequiredEvent, 2, NewObjective); //Teleporter type
 	}
+	if ( (NewObjective != None) && (aBot.Orders != 'Follow') )
+		aBot.OrderObject = NewObjective;
 	SetAttractionStateFor(aBot);
 	return true;
 }
@@ -966,7 +915,6 @@ ATTRACT_DEST:
 
 //****************************************
 // Utilitary methods
-// XC versions are used in XC_Engine servers
 
 function ResetPerZoneCounter()
 {
@@ -981,30 +929,7 @@ function int GetMonstersPerZone( byte ZoneNumber) //ACCESSOR
 	return MonstersPerZone[ZoneNumber];
 }
 
-//Monster counter
 function CountMonsters()
-{
-	local int i, iB;
-	local Pawn P;
-	
-	ResetPerZoneCounter();
-	For ( P=Level.PawnList ; P!=None ; P=P.NextPawn )
-		if ( P.IsA('ScriptedPawn') && (P.Health > 0) )
-		{
-			i++; //Ignore friendly monsters?
-			MonstersPerZone[P.Region.ZoneNumber] += int(P.AttitudeToPlayer < ATTITUDE_Friendly);
-			if ( ScriptedPawn(P).bIsBoss )
-				iB++;
-			if ( P.Shadow == None && (Level.NetMode != NM_DedicatedServer) )
-				P.Shadow = Spawn( Class'MonsterShadow', P);
-		}
-	if ( MonsterReplicationInfo(GameReplicationInfo) != None )
-		MonsterReplicationInfo(GameReplicationInfo).Monsters = i;
-	if ( Briefing != None )
-		Briefing.BossCount = iB;
-}
-
-function CountMonsters_XC()
 {
 	local int i, iB;
 	local ScriptedPawn S;
@@ -1030,17 +955,6 @@ function CountMonsters_XC()
 
 //Hunter counter
 function CountHunters()
-{
-	local int i;
-	local PlayerReplicationInfo PRI;
-	
-	ForEach AllActors (class'PlayerReplicationInfo', PRI)
-		if ( PRI.Owner != None && !PRI.Owner.IsA('ScriptedPawn') && !PRI.bIsSpectator )
-			i++;
-	if ( MonsterReplicationInfo(GameReplicationInfo) != None )
-		MonsterReplicationInfo(GameReplicationInfo).Hunters = i;
-}
-function CountHunters_XC()
 {
 	local int i;
 	local Pawn P;

@@ -5,13 +5,8 @@ class MonsterBase expands Mutator
 	config(MonsterHunt);
 
 var MonsterHunt Game;
-var() name UIWeaponName[10];
-var() config string UIWeaponReplacement[10];
-
-
-//XC_Engine
-native(1718) final function bool AddToPackageMap( optional string PkgName);
-native(1719) final function bool IsInPackageMap( optional string PkgName, optional bool bServerPackagesOnly); //Second parameter doesn't exist in 227!
+var() name UIWeaponName[14];
+var() config string UIWeaponReplacement[14];
 
 
 //Deny game breaking mutators
@@ -76,7 +71,7 @@ function ValidateWeapons()
 	For ( i=0 ; i<10 ; i++ )
 		if ( DynamicLoadObject( UIWeaponReplacement[i], class'Class') == None )
 			UIWeaponReplacement[i] = "";
-	if ( (Level.NetMode != NM_Standalone) && (int(ConsoleCommand("GET INI:ENGINE:ENGINE.GAMEENGINE XC_VERSION")) >= 13) )
+	if ( Level.NetMode != NM_Standalone )
 	{
 		For ( i=0 ; i<10 ; i++ )
 			if ( UIWeaponReplacement[i] != "" )
@@ -183,6 +178,10 @@ defaultproperties
 	UIWeaponName(7)=GESBioRifle
 	UIWeaponName(8)=Rifle
 	UIWeaponName(9)=Minigun
+	UIWeaponName(10)=QuadShot
+	UIWeaponName(11)=CARifle
+	UIWeaponName(12)=GrenadeLauncher
+	UIWeaponName(13)=RocketLauncher
 	UIWeaponReplacement(0)="MonsterHunt.OLDPistol"
 	UIWeaponReplacement(1)="MonsterHunt.OLAutoMag"
 	UIWeaponReplacement(2)="MonsterHunt.OLStinger"

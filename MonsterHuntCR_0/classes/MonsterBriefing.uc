@@ -30,27 +30,6 @@ replication
 		BossCount, KilledBosses, KilledMonsters, HuntersIcon;
 }
 
-//********************
-// XC_Core / XC_Engine
-native(1718) final function bool AddToPackageMap( optional string PkgName);
-native(3540) final iterator function PawnActors( class<Pawn> PawnClass, out pawn P, optional float Distance, optional vector VOrigin, optional bool bHasPRI, optional Pawn StartAt);
-native(3560) static final function bool ReplaceFunction( class<Object> ReplaceClass, class<Object> WithClass, name ReplaceFunction, name WithFunction, optional name InState);
-native(3561) static final function bool RestoreFunction( class<Object> RestoreClass, name RestoreFunction, optional name InState);
-
-
-function InitXCGE( int Version)
-{
-	if ( Version >= 11 )
-		AddtoPackageMap();
-	if ( Version >= 19 )
-	{
-		ReplaceFunction( class'MHCR_ScoreBoard', class'MHCR_ScoreBoard', 'GetCycles', 'GetCycles_XC');
-		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'FindIpToCountry', 'FindIpToCountry_XC');
-		ReplaceFunction( class'MonsterPlayerData', class'MonsterPlayerData', 'BroadcastMessage', 'BroadcastMessage_XC');
-		ReplaceFunction( class'MHE_MonsterSpawner', class'MHE_MonsterSpawner', 'CountPawns', 'CountPawns_XC');
-		ReplaceFunction( class'MHCR_Statics', class'MHCR_Statics', 'InCylinder', 'InCylinder_XC');
-	}
-}
 
 simulated event PostBeginPlay()
 {
@@ -58,7 +37,6 @@ simulated event PostBeginPlay()
 	local MHCR_HUD MHUD;
 	local MHCR_ScoreBoard MB;
 	local MonsterPlayerData MPD;
-	local int XC_Ver;
 
 	if ( Level.NetMode == NM_Client )
 	{
@@ -90,9 +68,7 @@ simulated event PostBeginPlay()
 	else
 	{
 		InitialState = 'Server';
-		XC_Ver = int(ConsoleCommand("GET INI:ENGINE.ENGINE.GAMEENGINE XC_VERSION"));
-		if ( XC_Ver >= 11 )
-			InitXCGE( XC_Ver);
+		AddtoPackageMap();
 	}
 
 }
@@ -309,6 +285,23 @@ NEXT_TRIGGER: //Trigger scanner
 	}
 }
 
+function SortEventsByProximity( vector V, out MHE_Base Events[16], int EventCount)
+{
+	local MHE_Base Link;
+	local float Dist;
+	local int i, Top;
+	
+	//Sort by distance
+	For ( Top=1 ; Top<EventCount ; Top++ )
+	{
+		Link = Events[Top];
+		Dist = VSize(Link.Location-V);
+		i = Top;
+		while ( (i > 0) && (Dist < VSize(Events[i-1].Location-V)) )
+			Events[i] = Events[--i];
+		Events[i] = Link;
+	}
+}
 
 function MHE_Base FindNextTrigger( name aEvent, optional MHE_Base LastFound)
 {

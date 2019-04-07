@@ -194,7 +194,7 @@ state ButtonState
 
 function ClearIfUseless()
 {
-	if ( !bMultiHit || ShouldAttractBots() || bTriggersMover || bTriggersPawn || bTriggersFactory )
+	if ( bMultiHit || ShouldAttractBots() || bTriggersMover || bTriggersPawn || bTriggersFactory )
 		return;
 	if ( RequiredEvent() != '' )
 		return;

@@ -77,8 +77,7 @@ event Timer()
 
 //Timer measuring
 native(3559) static final function int AppCycles();
-final function int GetCycles();
-final function int GetCycles_XC()
+final function int GetCycles()
 {
 	if ( PlayerPawn(Owner).bAdmin )
 		return AppCycles();

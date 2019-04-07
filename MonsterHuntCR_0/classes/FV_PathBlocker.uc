@@ -15,7 +15,7 @@ var int BlockedCount;
 var float LastScanned;
 
 //No need to forward the call to NavigationPoint
-native(519) final function describeSpec(int iSpec, out Actor Start, out Actor End, out int ReachFlags, out int Distance); 
+//native(519) final function describeSpec(int iSpec, out Actor Start, out Actor End, out int ReachFlags, out int Distance); 
 
 function FV_PathBlocker FindByTag( name aTag)
 {
@@ -160,7 +160,7 @@ function SetupTeleporter( Teleporter T)
 	local int rD, rF;
 	local int i, oldBlockedCount;
 
-	if ( T == None || !T.bEnabled || T.URL == "" )
+	if ( T == None || T.bEnabled || T.URL == "" )
 		return;
 		
 	oldBlockedCount = BlockedCount;

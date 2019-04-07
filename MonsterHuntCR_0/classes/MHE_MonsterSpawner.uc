@@ -134,17 +134,6 @@ function int CountPawns()
 	local ScriptedPawn S;
 	local int i;
 	
-	ForEach AllActors ( class'ScriptedPawn', S, ItemTag)
-		if ( S.Event == Tag )
-			i++;
-	return i;
-}
-
-function int CountPawns_XC()
-{
-	local ScriptedPawn S;
-	local int i;
-	
 	ForEach DynamicActors ( class'ScriptedPawn', S, ItemTag)
 		if ( S.Event == Tag )
 			i++;
