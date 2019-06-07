@@ -1,22 +1,35 @@
 class MHE_Monster expands MHE_Base;
 
-var ScriptedPawn Monsters[32];
-var int MonsterCount;
-var string EventChain;
+var ScriptedPawn Monsters[64];
+var ScriptedPawn CurrentTarget; //AI
+var MHE_Monster ExtraMonsters;
+var int MonsterCount; //Fast access
+var int BossCount; //Fast access
+var int OriginalIndex;
 
 function MHE_Monster AvailableForEvent( name aEvent)
 {
 	local MHE_Monster MHE;
 	For ( MHE=self ; MHE!=None ; MHE=MHE_Monster(MHE.NextEvent) )
-		if ( (MHE.Event == aEvent) && (MHE.MonsterCount < 32) )
+		if ( MHE.Event == aEvent )
 			return MHE;
 	return None;
 }
 
 function RegisterMonster( ScriptedPawn Other)
 {
-	Assert( MonsterCount < 32 );
-	Monsters[MonsterCount++] = Other;
+	local int Top;
+	
+	if ( (MonsterCount >= 64) && BossCount < 64 )
+		MonsterCount--;
+	
+	if ( Other.bIsBoss )
+	{
+		Monsters[MonsterCount++] = Monsters[BossCount];
+		Monsters[BossCount++] = Other;
+	}
+	else
+		Monsters[MonsterCount++] = Other;
 	Event = Other.Event;
 }
 
@@ -30,45 +43,92 @@ function PostInit()
 
 function RequiredForEvent(); //Somebody needs to activate this MHE_Base in order to activate an event
 
-
 event Timer()
 {
 	local int i;
+	local bool bActiveEnemy;
 	
 	For ( i=MonsterCount-1 ; i>=0 ; i-- )
+	{
 		if ( Monsters[i] == None || Monsters[i].bDeleteMe || Monsters[i].Health <= 0 )
 		{
-			Monsters[i] = Monsters[--MonsterCount];
-			Monsters[MonsterCount] = None;
+			if ( i < BossCount )
+			{
+				Monsters[i] = Monsters[--BossCount];
+				Monsters[BossCount] = Monsters[--MonsterCount];
+				BossCount--;
+			}
+			else
+				Monsters[i] = Monsters[--MonsterCount];
 		}
-
-	if ( MonsterCount > 0 )
+		else if ( !bDiscovered && !bActiveEnemy )
+			bActiveEnemy = (Monsters[i].Enemy != None) && (Monsters[i].Enemy.PlayerReplicationInfo != None);
+	}
+	
+	UpdateInterface();
+	
+	if ( CurrentTarget == None || CurrentTarget.bDeleteMe || CurrentTarget.Health <= 0 )
 	{
-		if ( !bDiscovered )
+		if ( MonsterCount > 0 )
+			CurrentTarget = Monsters[Rand(MonsterCount)];
+		else
 		{
-			i = Rand(MonsterCount);
-			if ( (Monsters[i].Enemy != None) && (Monsters[i].Enemy.PlayerReplicationInfo != None) )
-				Discover();
-		}
-		
-		if ( DeferTo == None || !DeferTo.FastTrace( Monsters[0].Location) )
-		{
-			DeferTo = None;
-			SetLocation( Monsters[0].Location);
-			FindDeferPoint( Monsters[0] );
-		}
-		
-		if ( DeferTo == None )
-		{
-			//Do something?
+			Destroy();
+			return;
 		}
 	}
+	
+	if ( DeferTo == None || !DeferTo.FastTrace( CurrentTarget.Location) )
+	{
+		DeferTo = None;
+		SetLocation( CurrentTarget.Location);
+		FindDeferPoint( CurrentTarget );
+	}
 		
-		
+	if ( !bDiscovered && bActiveEnemy )
+		Discover();
+
 	bAttractBots = bDiscovered || bQueriedByBot;
-	if ( MonsterCount <= 0 )
-		Destroy();
 }
+
+function UpdateInterface()
+{
+	local MHI_BossList MHI;
+	
+	MHI = MHI_BossList(Interface);
+	if ( MHI != None )
+	{
+		//Completed!
+		MHI.RemainingMinions = MonsterCount - BossCount;
+		if ( (MHI.CompletedAt == 0) && (MonsterCount <= 0) )
+			MHI.Completed();
+	}
+}
+
+function Discover() //Create interface here
+{
+	local MHI_BossList MHI;
+	local int i;
+
+	bDiscovered = true;
+	if ( Interface == None && (BossCount > 0) )
+	{
+		MHI = Spawn( class'MHI_BossList', self);
+		Interface = MHI;
+		OriginalIndex = MHI.EventIndex;
+		MHI.MonsterListGUID = EventGUID;
+		MHI.bDisplayDead = true;
+		For ( i=BossCount-1 ; i>=0 ; i-- )
+			if ( (Monsters[i] != None) && Monsters[i].bIsBoss && (Monsters[i].Health > 0) )
+				MHI.CreateStatus( Monsters[i], self);
+	}
+}
+
+event Destroyed()
+{
+	Super.Destroyed();
+}
+
 
 defaultproperties
 {

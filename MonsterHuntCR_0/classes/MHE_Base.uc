@@ -10,6 +10,7 @@ var(Debug) MHE_Base NextEvent;
 var(Debug) MHE_Base DeferUnreachable; //Defer objective if unreachable
 var(Debug) MHI_Base Interface;
 var(Debug) NavigationPoint DeferTo;
+var(Debug) int EventGUID;
 //Pointer to net breifing element!
 var(Debug) bool bDiscovered;
 var(Debug) bool bPostInit;
@@ -329,6 +330,7 @@ event PostBeginPlay()
 	{
 		NextEvent = Briefing.MapEventList;
 		Briefing.MapEventList = self;
+		EventGUID = Briefing.CurrentEventGUID++;
 	}
 }
 

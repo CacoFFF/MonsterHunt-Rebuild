@@ -47,6 +47,10 @@ function bool ShouldDefer( Pawn Seeker, Actor Goal, out NavigationPoint DeferTo,
 
 */
 
+// Prevent monsters from attacking each other upon bump
+function AnnoyedBy_Replacement( Pawn Other) {}		
+	
+
 event InitGame(string Options, out string Error)
 {
 	local Mutator M;
@@ -71,7 +75,10 @@ event InitGame(string Options, out string Error)
 		return;
 	}
 	
+	ReplaceFunction( class'ScriptedPawn', class'MonsterHunt', 'AnnoyedBy', 'AnnoyedBy_Replacement');
+	
 	Super.InitGame( Options, Error);
+	Difficulty = Min( 3, MonsterSkill);
 
 	//Validate UI replacements of MonsterBase
 	For ( M=BaseMutator ; M!=None ; M=M.NextMutator )
@@ -90,10 +97,7 @@ event InitGame(string Options, out string Error)
 	{
 		Briefing.HuntersIcon = T;
 		if ( Level.NetMode != NM_Standalone )
-		{
-			Log("DEBUG "$Left(HunterTeamIcon, InStr(HunterTeamIcon,".")) );
 			AddToPackageMap( Left(HunterTeamIcon, InStr(HunterTeamIcon,".")) );
-		}
 	}
 	
 	bCountMonstersAgain = true;
@@ -107,7 +111,7 @@ event PostLogin( PlayerPawn NewPlayer )
 	if ( NewPlayer.PlayerReplicationInfo != None && NewPlayer.PlayerReplicationInfo.bIsSpectator )
 	{
 		NewPlayer.Visibility = 0;
-		NewPlayer.Health = 0; //Will this one work?
+		NewPlayer.Health = 0;
 	}
 }
 
@@ -228,6 +232,9 @@ function bool RestartPlayer( Pawn aPlayer)
 {
 	local bool Result;
 
+	if ( Bot(aPlayer) != None )
+		Bot(aPlayer).OrderTag = 'Respawn';
+	
 	aPlayer.Visibility = aPlayer.default.Visibility;
 	if ( (Lives > 0) && (aPlayer.PlayerReplicationInfo != None) && (aPlayer.PlayerReplicationInfo.Deaths >= Lives) )
 	{
@@ -493,6 +500,7 @@ function int NearbyTeammates( Pawn Other, float Distance, bool bVisible)
 	return i;
 }
 
+
 //Generic DeferTo return, good for package independant mods
 //SuperDefer = 1 means that no pathfinding should be done
 function bool ShouldDefer( Pawn Seeker, Actor Goal, out NavigationPoint DeferTo, out byte SuperDefer)
@@ -506,6 +514,12 @@ function bool ShouldDefer( Pawn Seeker, Actor Goal, out NavigationPoint DeferTo,
 		if ( !MHE_Base(Goal).ShouldDefer( Seeker) ) //Bot already reached DeferTo
 			Goto SUPER_GOAL;
 		DeferTo = MHE_Base(Goal).DeferTo;
+	}
+	else if ( (Inventory(Goal) != None) && (Inventory(Goal).MyMarker != None) )
+	{
+		if ( MHS.static.ActorsTouching(Seeker,Inventory(Goal).MyMarker) )
+			Goto SUPER_GOAL;
+		DeferTo = Inventory(Goal).MyMarker;
 	}
 		
 	return DeferTo != None;
@@ -526,7 +540,8 @@ function Name EvaluateNextNodeTeleporter( Pawn Other)
 	{
 		Tele[0] = Teleporter(Other.RouteCache[i]);
 		Tele[1] = Teleporter(Other.RouteCache[++i]);
-		if ( (Tele[0] != None) && (Tele[1] != None) && !Tele[0].bEnabled ) //SpecialHandling can be especially annoying
+		if ( (Tele[0] != None) && (Tele[1] != None) && !Tele[0].bEnabled
+		&& (Tele[0].URL ~= string(Tele[1].Tag)) ) //SpecialHandling can be especially annoying
 			return Tele[0].Tag;
 	}
 	return '';
@@ -561,34 +576,84 @@ function Name EvaluateNextNodeDoor( Pawn Other)
 	return '';
 }
 
+//Returns 'tag' of what will unlock an obstructed path (if any)
+function name HandleObstrucedPath( Pawn Other, out NavigationPoint ObstructedPath, out int BlockType)
+{
+	local Actor A, B;
+	local vector HitLocation, HitNormal;
+	local NavigationPoint NextPath;
+	local Teleporter Tele[2];
+	local int i;
+	local bool bHasTrigger;
+	
+	//Evaluate elevator (outside)
+	if ( (LiftExit(Other.RouteCache[0]) != None) && (LiftCenter(Other.RouteCache[1]) != None) )
+	{
+	}
+	
+	//Evaluate teleporter
+	For ( i=0 ; i<2 ; i++ )
+	{
+		Tele[0] = Teleporter(Other.RouteCache[i]);
+		Tele[1] = Teleporter(Other.RouteCache[i+1]);
+		if ( (Tele[0] != None) && (Tele[1] != None) && !Tele[0].bEnabled && (Tele[0].URL ~= string(Tele[1].Tag)) ) 
+		{
+			BlockType = 2;
+			ObstructedPath = Tele[0];
+			return Tele[0].Tag;
+		}
+	}
+	
+	//Evaluate door
+	For ( i=0 ; i<2 ; i++ )
+	{
+		NextPath = Other.RouteCache[i];
+		if ( (NextPath != None) && (NextPath.upstreamPaths[0] != -1) ) //Selected by navigation code
+		{
+			ForEach Other.TraceActors( class'Actor', A, HitLocation, HitNormal, NextPath.Location)
+				if ( A.IsA('Mover') && (Mover(A).myMarker == None) //Unmarked lift
+				&& (InStr( string(A.InitialState),"Trigger") != -1) && !Mover(A).bInterpolating && !Mover(A).bDelaying && (Mover(A).SavedTrigger == None) )
+				{
+					bHasTrigger = false;
+					//Detect active trigger via trace //BIG EXTENT TO EASE DETECTION
+					ForEach Other.TraceActors( class'Actor', B, HitLocation, HitNormal, HitLocation+HitNormal*Other.CollisionRadius, Other.Location, vect(40,40,70) ) 
+						if ( B.Event == A.Tag )
+						{
+							bHasTrigger = bHasTrigger && ((Trigger(B) == None) || Trigger(B).bInitiallyActive);
+							break;
+						}
+					if ( !bHasTrigger )
+					{
+						BlockType = 1;
+						ObstructedPath = NextPath;
+						return A.Tag;
+					}
+				}
+		}
+	}
+	return '';
+}
+
+
+
 //Find what triggers this 'tag' and evaluate reachability
 //List all available MHE_Base actors
 //Requires Route Mapper to have run
 //BlockType codes:
 // - 1: Door
 // - 2: Teleporter
-function bool ModifyObjective( Pawn Other, name RequiredEvent, int BlockType, out Actor Objective)
+function bool ModifyObjective( Pawn Other, out Actor Objective)
 {
 	local MHE_Base Events[16], Link;
 	local int iE, i;
 	local float Dist;
 	local FV_PathBlocker FVPB;
 	local NavigationPoint NextPath;
+	local name RequiredEvent;
+	local int BlockType;
 	
-	//Obtain path to block
-	if ( BlockType == 2 )
-	{
-		for ( i=0 ; i<3 && NextPath == None && Other.RouteCache[i] != None ; i++ )
-			if ( (Teleporter(Other.RouteCache[i]) != None) && !Teleporter(Other.RouteCache[i]).bEnabled )
-				NextPath = Teleporter(Other.RouteCache[i]);
-	}
-	else
-	{
-		NextPath = NavigationPoint(Other.MoveTarget);
-		if ( NextPath == None )
-			NextPath = Other.RouteCache[0];
-	}
-	if ( (NextPath == None) || (RequiredEvent == '') )
+	RequiredEvent = HandleObstrucedPath( Other, NextPath, BlockType);
+	if ( (NextPath == None) || (RequiredEvent == '') || (BlockType == 0) )
 		return false;
 		
 	//Prepare a list of available events (direct triggers and chained triggers)
@@ -604,15 +669,6 @@ function bool ModifyObjective( Pawn Other, name RequiredEvent, int BlockType, ou
 	
 	//Sort by distance
 	Briefing.SortEventsByProximity( Other.Location, Events, iE);
-/*	For ( i=1 ; i<iE ; i++ )
-		if ( VSize(Events[i].Location-Other.Location) < VSize(Events[i-1].Location-Other.Location) )
-		{
-			Link = Events[i];
-			Events[i] = Events[i-1];
-			Events[i-1] = Link;
-			if ( i > 1 )
-				i -= 2;
-		}*/
 
 	//Get nearest attraction point
 	//Start with stuff that aren't objective markers
@@ -639,7 +695,7 @@ function bool ModifyObjective( Pawn Other, name RequiredEvent, int BlockType, ou
 	if		( BlockType == 1 )	FVPB.SetupBlock( NextPath, RequiredEvent);
 	else if	( BlockType == 2 )	FVPB.SetupTeleporter( Teleporter(NextPath) );
 	if ( bAIDebug )
-		Log("Blocking route that leads to"@RequiredEvent@"["$Other.PlayerReplicationInfo.PlayerName@"-"@BlockType$"]",'MonsterHunt');
+		Log("Blocking route that leads to"@RequiredEvent@"["$Other.PlayerReplicationInfo.PlayerName@"-"@BlockType$"] via"@NextPath.Name,'MonsterHunt');
 	//Notify MHE_Base we're becoming an objective, allows MHE_Base to self-modify
 	For ( i=0 ; i<iE ; i++ )
 		Events[i].RequiredForEvent();
@@ -654,10 +710,21 @@ function bool ModifyObjective( Pawn Other, name RequiredEvent, int BlockType, ou
 			if ( AttractTo( Other, Events[i].DeferTo) )
 			{
 				Objective = Events[i].DeferTo;
+				Other.MoveTarget = Other;
+				Other.SpecialGoal = Other;
+				Other.SpecialPause = 0.2;
 				return true;
 			}
 		}
 }
+
+
+// Selects a weapon nearby the bot
+function Inventory SelectRandomWeapon( Pawn CheckFor)
+{
+	return Briefing.SelectRandomWeapon( CheckFor);
+}
+
 
 
 // This will ONLY return a non-NavigationPoint instance when it is directly reachable
@@ -743,6 +810,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 {
 	local MonsterWaypoint W, BestW;
 	local MHE_Base MHE;
+	local Inventory GoalInv;
 	local float ChanceW;
 	local MonsterEnd E;
 	local Actor NewDest, NewObjective;
@@ -750,7 +818,6 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	local int BotID;
 	local float BotState;
 	local ScriptedPawn Enemy;
-	local name RequiredEvent;
 	local byte NoAttractionCheck;
 	local bool bAttract;
 
@@ -776,6 +843,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		//The more conditions, the more the bot is likely to charge
 		Limit = 3
 		+ int(aBot.Orders == 'Attack')
+		+ int(Inventory(aBot.OrderObject) != None) * 2 //Going for item anyways
 		+ int(aBot.Enemy == None) * 2
 		+ int(aBot.Weapon != none && aBot.Weapon.AiRating > 0.4 + FRand() * 0.2) * 2
 		+ aBot.Health/150
@@ -791,10 +859,26 @@ function bool FindSpecialAttractionFor( Bot aBot)
 		//Initiate Route Mapper
 		MapRoutes( aBot);
 
+		//Send bot to get an item
+		if ( aBot.OrderTag == 'Respawn' )
+		{
+			aBot.OrderObject = SelectRandomWeapon( aBot);
+			aBot.OrderTag = '';
+		}
+		GoalInv = Inventory(aBot.OrderObject);
+		if ( GoalInv != None )
+		{
+			if ( (aBot.FindInventoryType(GoalInv.Class) != None) || MHS.static.ActorsTouching(aBot,GoalInv) || !AttractTo( aBot, GoalInv) )
+				aBot.OrderObject = None;
+			else
+				Goto ATTRACT_DEST;
+		}
+		
 		//8-12 seconds prioritizing monsters (if MonsterLimit is too low the bot bounces back and forth!!)
 		MonsterLimit = 4
 		+ int(ScriptedPawn(aBot.OrderObject) != None) * 2
-		+ Limit / 8;
+		+ Limit / 8
+		- int(Inventory(aBot.OrderObject) != None) * 10; //Do not go for monsters when going for weapon
 
 		Enemy = ScriptedPawn(aBot.Enemy);
 		if ( Enemy == None )	Enemy = ScriptedPawn(aBot.OrderObject);
@@ -897,16 +981,7 @@ function bool FindSpecialAttractionFor( Bot aBot)
 	return False;
 ATTRACT_DEST:
 	NewDest = aBot.OrderObject;
-	RequiredEvent = EvaluateNextNodeDoor( aBot);
-	if ( RequiredEvent != '' )
-		ModifyObjective( aBot, RequiredEvent, 1, NewObjective); //Door Type
-	else
-	{
-		RequiredEvent = EvaluateNextNodeTeleporter( aBot);
-		if ( RequiredEvent != '' )
-			ModifyObjective( aBot, RequiredEvent, 2, NewObjective); //Teleporter type
-	}
-	if ( (NewObjective != None) && (aBot.Orders != 'Follow') )
+	if ( ModifyObjective( aBot, NewObjective) && (aBot.Orders != 'Follow') )
 		aBot.OrderObject = NewObjective;
 	SetAttractionStateFor(aBot);
 	return true;

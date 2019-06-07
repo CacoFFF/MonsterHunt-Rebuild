@@ -193,8 +193,8 @@ state ButtonState
 }
 
 function ClearIfUseless()
-{
-	if ( bMultiHit || ShouldAttractBots() || bTriggersMover || bTriggersPawn || bTriggersFactory )
+{ //!MultiHit ensures one-shot triggers are touched even if they're useless
+	if ( !bMultiHit || ShouldAttractBots() || bTriggersMover || bTriggersPawn || bTriggersFactory || bTogglesRoutes )
 		return;
 	if ( RequiredEvent() != '' )
 		return;

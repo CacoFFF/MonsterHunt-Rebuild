@@ -1,7 +1,18 @@
 //General purpose functions
 class MHCR_Statics expands Object;
 
-native(3571) static final function float HSize( vector A);
+
+static function ReplaceInventoryFunctions()
+{
+	ReplaceFunction( class'Inventory', class'MHCR_Inventory', 'BotDesireability', 'BotDesireability');
+	ReplaceFunction( class'Pickup', class'MHCR_Pickup', 'HandlePickupQuery', 'HandlePickupQuery');
+	ReplaceFunction( class'UT_ShieldBelt', class'MHCR_UT_ShieldBelt', 'HandlePickupQuery', 'HandlePickupQuery');
+	ReplaceFunction( class'UT_ShieldBelt', class'MHCR_UT_ShieldBelt', 'PickupFunction', 'PickupFunction');
+	ReplaceFunction( class'Armor2', class'MHCR_UT_ShieldBelt', 'HandlePickupQuery', 'HandlePickupQuery');
+	ReplaceFunction( class'ThighPads', class'MHCR_UT_ShieldBelt', 'HandlePickupQuery', 'HandlePickupQuery');
+	ReplaceFunction( class'Armor2', class'Pickup', 'SpawnCopy', 'SpawnCopy');
+	ReplaceFunction( class'ThighPads', class'Pickup', 'SpawnCopy', 'SpawnCopy');
+}
 
 
 static final function bool InCylinder( vector V, float EX, float EZ)

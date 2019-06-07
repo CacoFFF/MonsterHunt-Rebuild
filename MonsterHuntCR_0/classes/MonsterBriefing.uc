@@ -10,6 +10,7 @@ class MonsterBriefing expands Info;
 
 var MHI_Base InterfaceEventList, HintList;
 var MHE_Base MapEventList, TempEvent; //TempEvent is used during initialization and pathfinding
+var MHI_BossList BossList;
 var MonsterPlayerData DataHash[32];
 var MonsterPlayerData InactiveDatas;
 var MonsterAuthenticator AuthenticatorList;
@@ -19,10 +20,12 @@ var int PathQueryTag;
 
 var int CurrentIndex;
 var int CurrentTime;
+var int CurrentEventGUID;
 
 var int BossCount, KilledBosses, KilledMonsters;
 var Texture HuntersIcon;
 
+var class<Weapon> WeaponClass;
 
 replication
 {
@@ -78,6 +81,7 @@ state Server
 {
 	event BeginState()
 	{
+		class'MHCR_Statics'.static.ReplaceInventoryFunctions();
 		SetTimer( Level.TimeDilation, true);
 	}
 	
@@ -217,6 +221,73 @@ Begin:
 	Sleep( Level.TimeDilation+FRand() );
 	PlayerDataIntegrity();
 	Goto('Begin');
+}
+
+
+//********************************************************
+// AI helpers
+
+// Selects a weapon nearby the Pawn
+function Inventory SelectRandomWeapon( Pawn CheckFor)
+{
+	local InventorySpot IS, Best;
+	local int CurrentWeight, MaxWeight;
+	local float Chance;
+	local class<Weapon> WeaponClasses[64], WC;
+	local int Weights[64];
+	local int iW, i;
+	local Pawn P;
+	local bool bFavorite;
+
+	//Get this bot's favorite weapon if possible
+	SetPropertyText( "WeaponClass", CheckFor.GetPropertyText("FavoriteWeapon"));
+	
+	MaxWeight = 5000
+			 + FRand() * 5000
+			 + 1000 * int(StringToName(CheckFor.GetPropertyText("Orders")) != 'Attack')
+			 + 1000 * int(StringToName(CheckFor.GetPropertyText("Orders")) != 'FreeLance');
+			 
+	ForEach NavigationActors( class'InventorySpot', IS)
+		if ( (IS.StartPath != None) && (IS.VisitedWeight < MaxWeight*2) //Reachable
+		&& (Weapon(IS.MarkedItem) != None) && (Weapon(IS.MarkedItem).AIRating > 0.5) && (IS.MarkedItem.MyMarker == IS)	)
+		{
+			WC = Class<Weapon>(IS.MarkedItem.Class);
+			CurrentWeight = IS.VisitedWeight;
+			ForEach PawnActors( class'Pawn', P,,,true)
+				if ( P.Weapon != None && P.Weapon.Class == WC )
+					CurrentWeight = 50 + CurrentWeight * 11 / 10;
+			bFavorite = (WeaponClass != None) && ClassIsChildOf(WC,WeaponClass);
+			if ( CurrentWeight < MaxWeight )
+			{
+				//If two weapons are available, get the nearest one
+				For ( i=0 ; i<iW ; i++ )
+					if ( (WeaponClasses[i] == WC) && (Weights[i] > CurrentWeight) )
+					{
+						if ( (Best != None) && (Best.MarkedItem != None) && (Best.MarkedItem.Class == WC) ) //TODO: WHAT IS THIS
+						{
+							if ( Best.VisitedWeight > CurrentWeight )
+							{
+								Best = IS;
+								Weights[i] = CurrentWeight;
+							}
+							else
+								i = -1; //Do not consider for chance
+						}
+						break;
+					}
+				if ( i==iW && i<64 )
+				{
+					WeaponClasses[iW] = WC;
+					Weights[i] = CurrentWeight;
+				}
+				if ( (i >= 0) && (FRand() < 1.0/(Chance += 1.0)) )
+					Best = IS;
+				if ( bFavorite && (i >= 0) && (FRand() < 1.0/Chance) ) //Try again if favorite
+					Best = IS;
+			}
+		}
+	if ( Best != None )
+		return Best.MarkedItem;
 }
 
 

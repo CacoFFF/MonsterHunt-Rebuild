@@ -49,7 +49,6 @@ event PostBeginPlay()
 		Warn("MONSTER BRIEFING NOT FOUND!!!");
 }
 
-
 simulated event PostNetBeginPlay()
 {
 	ForEach AllActors( class'MonsterBriefing', Briefing)
